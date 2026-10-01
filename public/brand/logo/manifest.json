@@ -1,0 +1,12 @@
+{
+  "source": "Picorn vector signet (Cry Console)",
+  "updatedAt": "2026-10-01T23:35:03.714Z",
+  "files": {
+    "signet.svg": "Logo vetorial principal (hero auth, header, favicon SVG)",
+    "signet.png": "Logo raster 512px, fundo transparente",
+    "hero.png": "Logo raster 640px (alternativa ao SVG no hero)",
+    "icon-192.png": "Ícone PWA / Apple touch",
+    "favicon-32.png": "Favicon raster 32px"
+  },
+  "regenerate": "pnpm brand:export-logo (PNG a partir do signet.svg; vetor gerado via Picorn)"
+}
