@@ -1,26 +1,73 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:is(.dark *));
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --radius: 0.3125rem;
+  --background: #13131b;
+  --foreground: #e0e0ee;
+  --card: #1a1a24;
+  --card-foreground: #e0e0ee;
+  --popover: #1a1a24;
+  --popover-foreground: #e0e0ee;
+  --primary: #8234e9;
+  --primary-foreground: #ffffff;
+  --secondary: #2b2b3b;
+  --secondary-foreground: #e0e0ee;
+  --muted: #222230;
+  --muted-foreground: #8b8b9a;
+  --accent: #320863;
+  --accent-foreground: #b585fb;
+  --destructive: #e14915;
+  --border: #303040;
+  --input: #13131b;
+  --ring: #9956f6;
+  --brand-secondary: #02c793;
+  --link: #b585fb;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-brand-secondary: var(--brand-secondary);
+  --color-link: var(--link);
+  --font-sans: var(--font-inter);
+  --font-heading: var(--font-plus-jakarta);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
-}
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-heading), var(--font-sans), sans-serif;
+  }
 }
