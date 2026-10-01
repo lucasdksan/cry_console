@@ -74,6 +74,9 @@ web_modules/
 .cache
 .parcel-cache
 
+# Prisma generated client
+/src/generated/prisma
+
 # Next.js build output
 .next
 out
