@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Inter, Plus_Jakarta_Sans } from "next/font/google";
 
+import { TooltipProvider } from "@/frontend/components/ui/tooltip";
+
 import "./globals.css";
 
 const inter = Inter({
@@ -35,7 +37,9 @@ export default function RootLayout({
       lang="pt-BR"
       className={`${inter.variable} ${plusJakarta.variable} dark h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        <TooltipProvider>{children}</TooltipProvider>
+      </body>
     </html>
   );
 }

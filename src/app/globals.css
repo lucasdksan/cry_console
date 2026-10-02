@@ -24,6 +24,14 @@
   --ring: #9956f6;
   --brand-secondary: #02c793;
   --link: #b585fb;
+  --sidebar: #1a1a24;
+  --sidebar-foreground: #e0e0ee;
+  --sidebar-primary: #8234e9;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #222230;
+  --sidebar-accent-foreground: #e0e0ee;
+  --sidebar-border: #303040;
+  --sidebar-ring: #9956f6;
 }
 
 @theme inline {
@@ -47,6 +55,14 @@
   --color-ring: var(--ring);
   --color-brand-secondary: var(--brand-secondary);
   --color-link: var(--link);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
   --font-sans: var(--font-inter);
   --font-heading: var(--font-plus-jakarta);
   --radius-sm: calc(var(--radius) - 2px);
