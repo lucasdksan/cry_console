@@ -9,13 +9,34 @@ const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL!,
 });
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
+function createPrismaClient() {
+  return new PrismaClient({
     adapter,
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
 }
+
+function isStalePrismaClient(client: PrismaClient | undefined): boolean {
+  return Boolean(client && !("workspace" in client));
+}
+
+function resolvePrismaClient(): PrismaClient {
+  let candidate = globalForPrisma.prisma;
+
+  if (isStalePrismaClient(candidate)) {
+    candidate = undefined;
+    globalForPrisma.prisma = undefined;
+  }
+
+  if (!candidate) {
+    candidate = createPrismaClient();
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    globalForPrisma.prisma = candidate;
+  }
+
+  return candidate;
+}
+
+export const prisma = resolvePrismaClient();

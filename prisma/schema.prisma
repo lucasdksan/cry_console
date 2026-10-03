@@ -8,17 +8,43 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  image         String?
-  passwordHash  String?
-  accounts      Account[]
-  sessions      Session[]
-  resetTokens   PasswordResetToken[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                String      @id @default(cuid())
+  name              String?
+  email             String      @unique
+  emailVerified     DateTime?
+  image             String?
+  passwordHash      String?
+  activeWorkspaceId String?
+  accounts          Account[]
+  sessions          Session[]
+  resetTokens       PasswordResetToken[]
+  workspaces        Workspace[]
+  activeWorkspace   Workspace?  @relation("ActiveWorkspace", fields: [activeWorkspaceId], references: [id], onDelete: SetNull)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+}
+
+model Workspace {
+  id                  String   @id @default(cuid())
+  userId              String
+  name                String
+  nameKey             String
+  siteUrl             String
+  vtexAccountName     String?
+  vtexEnvironment     String?
+  vtexAppKeyEnc       String?  @db.Text
+  vtexAppTokenEnc     String?  @db.Text
+  clarityTokenEnc     String?  @db.Text
+  gaServiceAccountEnc String?  @db.Text
+  gaClientEmail       String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user           User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeForUsers User[] @relation("ActiveWorkspace")
+
+  @@unique([userId, nameKey])
+  @@index([userId])
 }
 
 model Account {
