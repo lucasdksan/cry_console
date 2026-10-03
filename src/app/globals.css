@@ -23,6 +23,10 @@
   --input: #13131b;
   --ring: #9956f6;
   --brand-secondary: #02c793;
+  --status-untested: #f6ab00;
+  --status-ok: var(--brand-secondary);
+  --status-missing: #5c5c6e;
+  --status-failed: var(--destructive);
   --link: #b585fb;
   --sidebar: #1a1a24;
   --sidebar-foreground: #e0e0ee;
