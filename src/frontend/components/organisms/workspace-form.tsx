@@ -11,6 +11,7 @@ import {
 import { VTEX_ENVIRONMENTS } from "@/backend/lib/workspace-policy";
 import type { WorkspacePublic } from "@/backend/models/workspace.model";
 import { FormField } from "@/frontend/components/atoms/form-field";
+import { NativeSelect } from "@/frontend/components/atoms/native-select";
 import { PasswordInput } from "@/frontend/components/atoms/password-input";
 import { WorkspaceSecretField } from "@/frontend/components/molecules/workspace-secret-field";
 import { Badge } from "@/frontend/components/ui/badge";
@@ -146,11 +147,10 @@ export function WorkspaceForm({ mode, workspace }: WorkspaceFormProps) {
               />
             </FormField>
             <FormField id="vtexEnvironment" label="VTEX Environment">
-              <select
+              <NativeSelect
                 id="vtexEnvironment"
                 name="vtexEnvironment"
                 defaultValue={workspace?.vtexEnvironment ?? ""}
-                className="flex h-11 w-full rounded-[var(--radius-md)] border border-input bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               >
                 <option value="">Selecione…</option>
                 {VTEX_ENVIRONMENTS.map((env) => (
@@ -158,7 +158,7 @@ export function WorkspaceForm({ mode, workspace }: WorkspaceFormProps) {
                     {env}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </FormField>
             {mode === "edit" && workspace ? (
               <>

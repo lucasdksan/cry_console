@@ -1,3 +1,5 @@
+import { Store } from "lucide-react";
+
 import {
   defaultNavSections,
   type NavGroupItem,
@@ -24,6 +26,7 @@ export function buildPrivateNavSections(
       id: `workspace-${workspace.id}`,
       label: workspace.name,
       href: `/lojas/${workspace.id}`,
+      icon: Store,
     })),
   };
 

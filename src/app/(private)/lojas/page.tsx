@@ -1,3 +1,4 @@
+import { Store } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -72,8 +73,12 @@ export default async function LojasPage() {
             <li key={workspace.id}>
               <Link
                 href={`/lojas/${workspace.id}`}
-                className="block rounded-[var(--radius-lg)] border border-border bg-card px-4 py-3 transition-colors hover:bg-muted/40"
+                className="flex items-center gap-2 rounded-[var(--radius-lg)] border border-border bg-card px-4 py-3 transition-colors hover:bg-muted/40"
               >
+                <Store
+                  className="size-4 shrink-0 text-muted-foreground"
+                  aria-hidden
+                />
                 <span className="font-medium">{workspace.name}</span>
               </Link>
             </li>
