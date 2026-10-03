@@ -1,9 +1,9 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 
 import { logoutUser } from "@/backend/controllers/auth.controller";
 import { BrandLogo } from "@/frontend/components/atoms/brand-logo";
@@ -25,8 +25,10 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarSeparator,
+  sidebarMenuButtonVariants,
   useSidebar,
 } from "@/frontend/components/ui/sidebar";
+import { cn } from "@/frontend/lib/utils";
 import {
   filterNavFooter,
   filterNavSections,
@@ -43,6 +45,7 @@ type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   footer: NavFooterItem[];
   slots?: Partial<Record<"session", React.ReactNode>>;
   onNavigate?: () => void;
+  workspaceLimitReached?: boolean;
 };
 
 function isNavItemActive(pathname: string, href: string): boolean {
@@ -54,6 +57,7 @@ export function AppSidebar({
   footer,
   slots,
   onNavigate,
+  workspaceLimitReached = false,
   ...props
 }: AppSidebarProps) {
   const pathname = usePathname();
@@ -119,13 +123,15 @@ export function AppSidebar({
 
     return (
       <SidebarMenuItem>
-        <SidebarMenuButton
-          isActive={active}
-          render={<Link href={item.href} onClick={closeMobileNav} />}
+        <Link
+          href={item.href}
+          onClick={closeMobileNav}
+          data-active={active ? "" : undefined}
+          className={cn(sidebarMenuButtonVariants())}
         >
           {Icon ? <Icon /> : null}
           <span>{item.label}</span>
-        </SidebarMenuButton>
+        </Link>
       </SidebarMenuItem>
     );
   }
@@ -159,11 +165,25 @@ export function AppSidebar({
             if (section.type === "group") {
               return (
                 <SidebarGroup key={section.id} className="py-0">
-                  <SidebarGroupLabel className="uppercase tracking-wide">
-                    {section.label}
+                  <SidebarGroupLabel className="flex items-center justify-between uppercase tracking-wide">
+                    <span>{section.label}</span>
+                    {section.headerAction && !workspaceLimitReached ? (
+                      <Link
+                        href={section.headerAction.href}
+                        onClick={closeMobileNav}
+                        className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        aria-label={section.headerAction.ariaLabel}
+                      >
+                        <Plus />
+                      </Link>
+                    ) : null}
                   </SidebarGroupLabel>
                   <SidebarGroupContent>
-                    <SidebarMenu>{section.items.map(renderLeaf)}</SidebarMenu>
+                    <SidebarMenu>
+                      {section.items.map((item) => (
+                        <Fragment key={item.id}>{renderLeaf(item)}</Fragment>
+                      ))}
+                    </SidebarMenu>
                   </SidebarGroupContent>
                 </SidebarGroup>
               );
@@ -183,7 +203,11 @@ export function AppSidebar({
       {filteredFooter.length > 0 ? (
         <SidebarFooter className="p-3">
           <SidebarSeparator />
-          <SidebarMenu>{filteredFooter.map(renderLeaf)}</SidebarMenu>
+          <SidebarMenu>
+            {filteredFooter.map((item) => (
+              <Fragment key={item.id}>{renderLeaf(item)}</Fragment>
+            ))}
+          </SidebarMenu>
         </SidebarFooter>
       ) : null}
     </Sidebar>

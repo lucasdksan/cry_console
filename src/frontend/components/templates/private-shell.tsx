@@ -1,11 +1,15 @@
 "use client";
 
+import { useMemo } from "react";
+
 import {
   defaultNavFooter,
-  defaultNavSections,
   type NavFooterItem,
-  type NavSectionItem,
 } from "@/frontend/navigation/nav";
+import {
+  buildPrivateNavSections,
+  type WorkspaceNavSummary,
+} from "@/frontend/navigation/workspace-nav";
 import { AppSidebar } from "@/frontend/components/organisms/app-sidebar";
 import { BrandLogo } from "@/frontend/components/atoms/brand-logo";
 import {
@@ -17,17 +21,23 @@ import { Separator } from "@/frontend/components/ui/separator";
 
 type PrivateShellProps = {
   children: React.ReactNode;
-  sections?: NavSectionItem[];
+  workspaces: WorkspaceNavSummary[];
   footer?: NavFooterItem[];
   slots?: Partial<Record<"session", React.ReactNode>>;
+  workspaceLimitReached?: boolean;
 };
 
 export function PrivateShell({
   children,
-  sections = defaultNavSections,
+  workspaces,
   footer = defaultNavFooter,
   slots,
+  workspaceLimitReached = false,
 }: PrivateShellProps) {
+  const sections = useMemo(
+    () => buildPrivateNavSections(workspaces),
+    [workspaces],
+  );
   return (
     <SidebarProvider
       defaultOpen
@@ -38,7 +48,12 @@ export function PrivateShell({
         } as React.CSSProperties
       }
     >
-      <AppSidebar sections={sections} footer={footer} slots={slots} />
+      <AppSidebar
+        sections={sections}
+        footer={footer}
+        slots={slots}
+        workspaceLimitReached={workspaceLimitReached}
+      />
       <SidebarInset className="min-h-svh">
         <header className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3 md:hidden">
           <SidebarTrigger />

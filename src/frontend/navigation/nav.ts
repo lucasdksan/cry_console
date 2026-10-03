@@ -34,11 +34,17 @@ export type NavLeafItem =
   | NavActionItem
   | NavSlotItem;
 
+export type NavGroupHeaderAction = {
+  href: string;
+  ariaLabel: string;
+};
+
 export type NavGroupItem = {
   type: "group";
   id: string;
   label: string;
   items: NavLeafItem[];
+  headerAction?: NavGroupHeaderAction;
 };
 
 export type NavSectionItem = NavGroupItem | NavLeafItem;
