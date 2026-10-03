@@ -33,6 +33,19 @@ export type WorkspacePublic = {
 
 export type WorkspaceSummary = Pick<WorkspacePublic, "id" | "name">;
 
+export type WorkspaceOverviewListItem = {
+  id: string;
+  name: string;
+  siteUrl: string;
+  vtexAccountName: string | null;
+  vtexEnvironment: string | null;
+  hasVtexAppKey: boolean;
+  hasVtexAppToken: boolean;
+  hasClarityToken: boolean;
+  hasGaServiceAccount: boolean;
+  gaPropertyId: string | null;
+};
+
 export type WorkspaceVtexConfig = {
   account: string;
   environment: VtexEnvironment;
@@ -68,6 +81,27 @@ export async function listWorkspaceSummariesForUser(
     select: { id: true, name: true },
   });
   return rows;
+}
+
+export async function listWorkspacesForOverview(
+  userId: string,
+): Promise<WorkspaceOverviewListItem[]> {
+  const rows = await prisma.workspace.findMany({
+    where: { userId },
+    orderBy: { createdAt: "asc" },
+  });
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    siteUrl: row.siteUrl,
+    vtexAccountName: row.vtexAccountName,
+    vtexEnvironment: row.vtexEnvironment,
+    hasVtexAppKey: Boolean(row.vtexAppKeyEnc),
+    hasVtexAppToken: Boolean(row.vtexAppTokenEnc),
+    hasClarityToken: Boolean(row.clarityTokenEnc),
+    hasGaServiceAccount: Boolean(row.gaServiceAccountEnc),
+    gaPropertyId: row.gaPropertyId,
+  }));
 }
 
 export async function getUserActiveWorkspaceId(
