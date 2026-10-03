@@ -37,7 +37,10 @@ export default function RootLayout({
       lang="pt-BR"
       className={`${inter.variable} ${plusJakarta.variable} dark h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col">
+      <body
+        className="flex min-h-full flex-col"
+        suppressHydrationWarning
+      >
         <TooltipProvider>{children}</TooltipProvider>
       </body>
     </html>
