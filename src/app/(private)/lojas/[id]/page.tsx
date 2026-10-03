@@ -7,7 +7,10 @@ import {
   findWorkspaceForUser,
   getUserActiveWorkspaceId,
 } from "@/backend/models/workspace.model";
+import { isSentryServerConfigured } from "@/backend/lib/sentry";
+import { findObservabilityForUserWorkspace } from "@/backend/models/observability.model";
 import { WorkspaceDeleteZone } from "@/frontend/components/molecules/workspace-delete-zone";
+import { ObservabilityForm } from "@/frontend/components/organisms/observability-form";
 import { WorkspaceForm } from "@/frontend/components/organisms/workspace-form";
 import { buttonVariants } from "@/frontend/components/ui/button";
 import { cn } from "@/frontend/lib/utils";
@@ -33,6 +36,13 @@ export default async function LojaDetalhePage({ params }: LojaDetalhePageProps) 
     await activateWorkspace(workspace.id);
   }
 
+  const observability = await findObservabilityForUserWorkspace(
+    session.user.id,
+    workspace.id,
+  );
+  const scriptBaseUrl =
+    process.env.AUTH_URL?.trim().replace(/\/+$/, "") ?? "http://localhost:3000";
+
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <div className="flex flex-col gap-3">
@@ -53,6 +63,14 @@ export default async function LojaDetalhePage({ params }: LojaDetalhePageProps) 
         </div>
       </div>
       <WorkspaceForm mode="edit" workspace={workspace} />
+      {observability ? (
+        <ObservabilityForm
+          workspaceId={workspace.id}
+          observability={observability}
+          sentryConfigured={isSentryServerConfigured()}
+          scriptBaseUrl={scriptBaseUrl}
+        />
+      ) : null}
       <WorkspaceDeleteZone
         workspaceId={workspace.id}
         workspaceName={workspace.name}

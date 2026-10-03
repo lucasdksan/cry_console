@@ -15,6 +15,12 @@ import {
 } from "@/backend/lib/workspace-policy";
 import type { SecretField } from "@/backend/lib/credentials-crypto";
 import {
+  deleteSentryProject,
+  isSentryServerConfigured,
+  SentryApiError,
+} from "@/backend/lib/sentry";
+import { getSentryProjectSlugForUserWorkspace } from "@/backend/models/observability.model";
+import {
   clearWorkspaceSecretForUser,
   createWorkspaceForUser,
   deleteWorkspaceForUser,
@@ -358,6 +364,26 @@ export async function deleteWorkspace(
   }
 
   try {
+    if (isSentryServerConfigured()) {
+      const projectSlug = await getSentryProjectSlugForUserWorkspace(
+        userId,
+        workspaceId,
+      );
+      if (projectSlug) {
+        try {
+          await deleteSentryProject(projectSlug);
+        } catch (error) {
+          if (error instanceof SentryApiError) {
+            return {
+              error:
+                "Não foi possível remover o projeto no Sentry. A loja não foi excluída.",
+            };
+          }
+          return { error: "Falha ao remover observabilidade no Sentry." };
+        }
+      }
+    }
+
     await deleteWorkspaceForUser(userId, workspaceId);
     revalidatePath("/", "layout");
     redirect("/lojas");
