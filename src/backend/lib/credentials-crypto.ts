@@ -15,6 +15,9 @@ export const SECRET_FIELDS = [
 
 export type SecretField = (typeof SECRET_FIELDS)[number];
 
+export const USER_AI_API_TOKEN_FIELD = "aiApiToken" as const;
+export type UserSecretField = typeof USER_AI_API_TOKEN_FIELD;
+
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
 const KEY_LENGTH = 32;
@@ -55,6 +58,67 @@ export function isCredentialsEncryptionConfigured(): boolean {
 
 function aadFor(workspaceId: string, field: SecretField): Buffer {
   return Buffer.from(`${workspaceId}:${field}`, "utf8");
+}
+
+function aadForUser(userId: string, field: UserSecretField): Buffer {
+  return Buffer.from(`user:${userId}:${field}`, "utf8");
+}
+
+function aadForUserAiProvider(
+  userId: string,
+  providerKey: string,
+): Buffer {
+  return Buffer.from(`user:${userId}:aiProvider:${providerKey}`, "utf8");
+}
+
+export function encryptUserAiProviderSecret(
+  plaintext: string,
+  userId: string,
+  providerKey: string,
+): string {
+  const key = parseEncryptionKey();
+  const iv = randomBytes(IV_LENGTH);
+  const cipher = createCipheriv(ALGORITHM, key, iv) as CipherGCM;
+  cipher.setAAD(aadForUserAiProvider(userId, providerKey));
+
+  const ciphertext = Buffer.concat([
+    cipher.update(plaintext, "utf8"),
+    cipher.final(),
+  ]);
+  const tag = cipher.getAuthTag();
+
+  return [
+    "v1",
+    iv.toString("base64url"),
+    tag.toString("base64url"),
+    ciphertext.toString("base64url"),
+  ].join(":");
+}
+
+export function decryptUserAiProviderSecret(
+  payload: string,
+  userId: string,
+  providerKey: string,
+): string {
+  const key = parseEncryptionKey();
+  const parts = payload.split(":");
+  if (parts.length !== 4 || parts[0] !== "v1") {
+    throw new CredentialsCryptoError("Formato de segredo inválido.");
+  }
+
+  const [, ivPart, tagPart, dataPart] = parts;
+  const iv = Buffer.from(ivPart, "base64url");
+  const tag = Buffer.from(tagPart, "base64url");
+  const ciphertext = Buffer.from(dataPart, "base64url");
+
+  const decipher = createDecipheriv(ALGORITHM, key, iv) as DecipherGCM;
+  decipher.setAAD(aadForUserAiProvider(userId, providerKey));
+  decipher.setAuthTag(tag);
+
+  return Buffer.concat([
+    decipher.update(ciphertext),
+    decipher.final(),
+  ]).toString("utf8");
 }
 
 export function encryptSecret(
@@ -99,6 +163,56 @@ export function decryptSecret(
 
   const decipher = createDecipheriv(ALGORITHM, key, iv) as DecipherGCM;
   decipher.setAAD(aadFor(workspaceId, field));
+  decipher.setAuthTag(tag);
+
+  return Buffer.concat([
+    decipher.update(ciphertext),
+    decipher.final(),
+  ]).toString("utf8");
+}
+
+export function encryptUserSecret(
+  plaintext: string,
+  userId: string,
+  field: UserSecretField = USER_AI_API_TOKEN_FIELD,
+): string {
+  const key = parseEncryptionKey();
+  const iv = randomBytes(IV_LENGTH);
+  const cipher = createCipheriv(ALGORITHM, key, iv) as CipherGCM;
+  cipher.setAAD(aadForUser(userId, field));
+
+  const ciphertext = Buffer.concat([
+    cipher.update(plaintext, "utf8"),
+    cipher.final(),
+  ]);
+  const tag = cipher.getAuthTag();
+
+  return [
+    "v1",
+    iv.toString("base64url"),
+    tag.toString("base64url"),
+    ciphertext.toString("base64url"),
+  ].join(":");
+}
+
+export function decryptUserSecret(
+  payload: string,
+  userId: string,
+  field: UserSecretField = USER_AI_API_TOKEN_FIELD,
+): string {
+  const key = parseEncryptionKey();
+  const parts = payload.split(":");
+  if (parts.length !== 4 || parts[0] !== "v1") {
+    throw new CredentialsCryptoError("Formato de segredo inválido.");
+  }
+
+  const [, ivPart, tagPart, dataPart] = parts;
+  const iv = Buffer.from(ivPart, "base64url");
+  const tag = Buffer.from(tagPart, "base64url");
+  const ciphertext = Buffer.from(dataPart, "base64url");
+
+  const decipher = createDecipheriv(ALGORITHM, key, iv) as DecipherGCM;
+  decipher.setAAD(aadForUser(userId, field));
   decipher.setAuthTag(tag);
 
   return Buffer.concat([

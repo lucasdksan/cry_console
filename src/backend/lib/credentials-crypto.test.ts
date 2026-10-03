@@ -2,7 +2,11 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   decryptSecret,
+  decryptUserSecret,
   encryptSecret,
+  encryptUserAiProviderSecret,
+  encryptUserSecret,
+  decryptUserAiProviderSecret,
   type SecretField,
 } from "@/backend/lib/credentials-crypto";
 
@@ -36,5 +40,30 @@ describe("credentials-crypto", () => {
     const a = encryptSecret("same", "ws1", "vtexAppKey");
     const b = encryptSecret("same", "ws1", "vtexAppKey");
     expect(a).not.toBe(b);
+  });
+
+  it("cifra e decifra segredos de usuário com AAD próprio", () => {
+    process.env.CREDENTIALS_ENCRYPTION_KEY = TEST_KEY;
+    const userId = "user_abc";
+    const plaintext = "sk-test-token";
+
+    const payload = encryptUserSecret(plaintext, userId);
+    expect(decryptUserSecret(payload, userId)).toBe(plaintext);
+  });
+
+  it("rejeita descriptografia de segredo de usuário com userId incorreto", () => {
+    process.env.CREDENTIALS_ENCRYPTION_KEY = TEST_KEY;
+    const payload = encryptUserSecret("x", "user1");
+
+    expect(() => decryptUserSecret(payload, "user2")).toThrow();
+  });
+
+  it("cifra token de provedor com AAD por providerKey", () => {
+    process.env.CREDENTIALS_ENCRYPTION_KEY = TEST_KEY;
+    const payload = encryptUserAiProviderSecret("tok", "user1", "openai");
+    expect(decryptUserAiProviderSecret(payload, "user1", "openai")).toBe("tok");
+    expect(() =>
+      decryptUserAiProviderSecret(payload, "user1", "anthropic"),
+    ).toThrow();
   });
 });
