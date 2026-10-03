@@ -4,11 +4,11 @@ import {
   listWorkspaceSummariesForUser,
 } from "@/backend/models/workspace.model";
 import { MAX_WORKSPACES_PER_USER } from "@/backend/lib/workspace-policy";
-import { NavSessionSlot } from "@/frontend/components/molecules/nav-session-slot";
+import { AccountSettingsSessionTrigger } from "@/frontend/components/organisms/account-settings-session-trigger";
 import { PrivateShell } from "@/frontend/components/templates/private-shell";
 import { redirect } from "next/navigation";
 
-export default async function PrivateLayout({
+export default async function Layout({
   children,
 }: {
   children: React.ReactNode;
@@ -29,7 +29,7 @@ export default async function PrivateLayout({
       workspaceLimitReached={workspaceCount >= MAX_WORKSPACES_PER_USER}
       slots={{
         session: (
-          <NavSessionSlot
+          <AccountSettingsSessionTrigger
             email={session.user.email}
             name={session.user.name}
             image={session.user.image}
