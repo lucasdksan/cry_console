@@ -1,6 +1,10 @@
 import type { FetchFn } from "@/backend/lib/google/google-auth";
 import { toGoogleApiDate } from "@/backend/lib/google/period";
 import {
+  pickGscSiteUrl,
+  type GscSiteEntry,
+} from "@/backend/lib/google/gsc-site-url";
+import {
   adaptSearchConsole,
   type SearchConsoleNormalized,
 } from "@/backend/lib/normalized-adapters";
@@ -15,6 +19,28 @@ type GscQueryResponse = {
   }>;
   responseAggregationType?: string;
 };
+
+async function listSearchConsoleSites(
+  accessToken: string,
+  fetchFn: FetchFn,
+): Promise<GscSiteEntry[]> {
+  const response = await fetchFn(
+    "https://www.googleapis.com/webmasters/v3/sites",
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    },
+  );
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    throw new Error(
+      `Search Console API falhou (${response.status}): ${text.slice(0, 240)}`,
+    );
+  }
+
+  const json = (await response.json()) as { siteEntry?: GscSiteEntry[] };
+  return json.siteEntry ?? [];
+}
 
 async function querySearchAnalytics(
   accessToken: string,
@@ -78,17 +104,24 @@ export async function collectSearchConsole(
   const fetchFn = input.fetchFn ?? fetch;
   const startDate = toGoogleApiDate(input.period.start);
   const endDate = toGoogleApiDate(input.period.end);
+  const sites = await listSearchConsoleSites(input.accessToken, fetchFn);
+  const siteUrl = pickGscSiteUrl(input.siteUrl, sites);
+  if (!siteUrl) {
+    throw new Error(
+      `A service account não tem permissão no Search Console para ${input.siteUrl}. Adicione o e-mail da service account como usuário da propriedade (URL com prefixo ou domínio).`,
+    );
+  }
 
   const [overviewResponse, queryResponse] = await Promise.all([
     querySearchAnalytics(
       input.accessToken,
-      input.siteUrl,
+      siteUrl,
       { startDate, endDate, rowLimit: 1 },
       fetchFn,
     ),
     querySearchAnalytics(
       input.accessToken,
-      input.siteUrl,
+      siteUrl,
       {
         startDate,
         endDate,
