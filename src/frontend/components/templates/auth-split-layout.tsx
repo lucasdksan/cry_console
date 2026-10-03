@@ -15,12 +15,13 @@ export function AuthSplitLayout({ children }: AuthSplitLayoutProps) {
       <div className={`relative overflow-hidden lg:hidden ${mobileBackdrop}`}>
         <div className="relative flex items-center justify-center px-6 py-8">
           <Image
-            src="/brand/logo/signet.png"
+            src="/brand/logo/signet.svg"
             alt="Cry Console"
             width={96}
             height={96}
             className="size-20"
             priority
+            unoptimized
           />
         </div>
       </div>

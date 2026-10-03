@@ -33,7 +33,7 @@ export function BrandLogo({
           width={48}
           height={48}
           className={cn(
-            "max-w-none object-contain object-center scale-[1.18]",
+            "object-contain object-center",
             signetClass,
           )}
           priority
