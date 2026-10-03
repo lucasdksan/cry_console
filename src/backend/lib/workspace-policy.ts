@@ -81,9 +81,18 @@ export function assertVtexAccountFields(input: {
   }
 }
 
+export const gaPropertyIdSchema = z
+  .string()
+  .trim()
+  .refine(
+    (value) => value === "" || /^\d+$/.test(value),
+    "Informe apenas números do GA4 Property ID.",
+  );
+
 export const workspaceBaseSchema = z.object({
   name: z.string().trim().min(2, "Informe o nome da loja."),
   siteUrl: httpsUrlSchema,
   vtexAccountName: z.string().trim().optional(),
   vtexEnvironment: z.enum(VTEX_ENVIRONMENTS).optional(),
+  gaPropertyId: gaPropertyIdSchema.optional(),
 });

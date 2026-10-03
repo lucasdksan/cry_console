@@ -119,6 +119,7 @@ type ParsedWorkspaceForm = {
   vtexAccountName: string | null;
   vtexEnvironment: string | null;
   gaClientEmail: string | null;
+  gaPropertyId: string | null;
   secrets: Parameters<typeof createWorkspaceForUser>[1]["secrets"];
 };
 
@@ -126,12 +127,14 @@ async function parseWorkspaceForm(
   formData: FormData,
   options: { mode: "create" | "update"; configured: Record<SecretField, boolean> },
 ): Promise<ParsedWorkspaceForm | WorkspaceActionState> {
+  const gaPropertyRaw = optionalTrimmed(formData.get("gaPropertyId"));
   const baseParsed = workspaceBaseSchema.safeParse({
     name: formData.get("name"),
     siteUrl: formData.get("siteUrl"),
     vtexAccountName: optionalTrimmed(formData.get("vtexAccountName")) || undefined,
     vtexEnvironment:
       optionalTrimmed(formData.get("vtexEnvironment")) || undefined,
+    gaPropertyId: gaPropertyRaw || undefined,
   });
 
   if (!baseParsed.success) {
@@ -210,12 +213,16 @@ async function parseWorkspaceForm(
   const gaClientEmail =
     gaUpdate.action === "set" ? gaUpdate.clientEmail : null;
 
+  const gaPropertyId =
+    baseParsed.data.gaPropertyId?.trim() || gaPropertyRaw || null;
+
   return {
     name: baseParsed.data.name,
     siteUrl: baseParsed.data.siteUrl,
     vtexAccountName: baseParsed.data.vtexAccountName?.trim() || null,
     vtexEnvironment: baseParsed.data.vtexEnvironment ?? null,
     gaClientEmail,
+    gaPropertyId: gaPropertyId?.trim() ? gaPropertyId.trim() : null,
     secrets: {
       vtexAppKey: vtexAppKey,
       vtexAppToken: vtexAppToken,

@@ -6,7 +6,7 @@ import { PrismaClient } from "@/generated/prisma/client";
  * Next.js dev keeps `globalThis.prisma` across HMR; an outdated client throws
  * validation errors for fields that exist in the generated client but not in memory.
  */
-const PRISMA_CLIENT_CACHE_KEY = "cry-console-prisma-v3-user-ai-providers";
+const PRISMA_CLIENT_CACHE_KEY = "cry-console-prisma-v4-ga-property-id";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;

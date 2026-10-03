@@ -62,7 +62,7 @@ export default async function LojaDetalhePage({ params }: LojaDetalhePageProps) 
           </p>
         </div>
       </div>
-      <WorkspaceForm mode="edit" workspace={workspace} />
+      <WorkspaceForm key={workspace.id} mode="edit" workspace={workspace} />
       {observability ? (
         <ObservabilityForm
           workspaceId={workspace.id}

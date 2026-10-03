@@ -26,6 +26,7 @@ export type WorkspacePublic = {
   hasClarityToken: boolean;
   hasGaServiceAccount: boolean;
   gaClientEmail: string | null;
+  gaPropertyId: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -52,6 +53,7 @@ function toWorkspacePublic(row: Workspace): WorkspacePublic {
     hasClarityToken: Boolean(row.clarityTokenEnc),
     hasGaServiceAccount: Boolean(row.gaServiceAccountEnc),
     gaClientEmail: row.gaClientEmail,
+    gaPropertyId: row.gaPropertyId,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -198,6 +200,7 @@ type WorkspaceWriteInput = {
   vtexAccountName: string | null;
   vtexEnvironment: string | null;
   gaClientEmail: string | null;
+  gaPropertyId: string | null;
   secrets: SecretUpdates;
 };
 
@@ -301,6 +304,7 @@ export async function createWorkspaceForUser(
         vtexAccountName: input.vtexAccountName,
         vtexEnvironment: input.vtexEnvironment,
         gaClientEmail: input.gaClientEmail,
+        gaPropertyId: input.gaPropertyId,
       },
     });
 
@@ -308,6 +312,7 @@ export async function createWorkspaceForUser(
       vtexAccountName: input.vtexAccountName,
       vtexEnvironment: input.vtexEnvironment,
       gaClientEmail: input.gaClientEmail,
+      gaPropertyId: input.gaPropertyId,
     });
 
     const updated =
@@ -366,6 +371,7 @@ export async function updateWorkspaceForUser(
       vtexAccountName: input.vtexAccountName,
       vtexEnvironment: input.vtexEnvironment,
       gaClientEmail,
+      gaPropertyId: input.gaPropertyId,
     });
 
     const updated = await tx.workspace.update({

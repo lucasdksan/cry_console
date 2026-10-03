@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 
 import {
   createWorkspace,
@@ -39,6 +39,13 @@ export function WorkspaceForm({ mode, workspace }: WorkspaceFormProps) {
     WorkspaceActionState,
     FormData
   >(action, {});
+  const [gaPropertyId, setGaPropertyId] = useState(
+    workspace?.gaPropertyId ?? "",
+  );
+
+  useEffect(() => {
+    setGaPropertyId(workspace?.gaPropertyId ?? "");
+  }, [workspace?.gaPropertyId]);
 
   const bannerError = state.error;
   const bannerSuccess = state.success;
@@ -255,6 +262,22 @@ export function WorkspaceForm({ mode, workspace }: WorkspaceFormProps) {
                 className="h-auto min-h-11 rounded-[var(--radius-md)] py-2"
               />
             </div>
+            <FormField
+              id="gaPropertyId"
+              label="GA4 Property ID"
+              error={state.fieldErrors?.gaPropertyId?.[0]}
+            >
+              <Input
+                id="gaPropertyId"
+                name="gaPropertyId"
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="123456789"
+                value={gaPropertyId}
+                onChange={(event) => setGaPropertyId(event.target.value)}
+                className="rounded-[var(--radius-md)] border-border bg-background"
+              />
+            </FormField>
             <FormField
               id="gaServiceAccountJson"
               label="Ou cole o JSON"
