@@ -18,10 +18,26 @@ model User {
   accounts          Account[]
   sessions          Session[]
   resetTokens       PasswordResetToken[]
+  aiProviders       UserAiProvider[]
   workspaces        Workspace[]
   activeWorkspace   Workspace?  @relation("ActiveWorkspace", fields: [activeWorkspaceId], references: [id], onDelete: SetNull)
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
+}
+
+model UserAiProvider {
+  id           String   @id @default(cuid())
+  userId       String
+  providerKey  String
+  defaultModel String?
+  apiTokenEnc  String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, providerKey])
+  @@index([userId])
 }
 
 model Workspace {
