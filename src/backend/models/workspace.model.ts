@@ -1,11 +1,16 @@
 import {
   CredentialsCryptoError,
+  decryptSecret,
   encryptSecret,
   type SecretField,
 } from "@/backend/lib/credentials-crypto";
+import type { WorkspaceMeasurementSecrets } from "@/backend/lib/measurement/run-collect";
 import {
+  assertVtexAccountFields,
   MAX_WORKSPACES_PER_USER,
   normalizeWorkspaceNameKey,
+  parseGaServiceAccountJson,
+  type VtexEnvironment,
 } from "@/backend/lib/workspace-policy";
 import { prisma } from "@/backend/models/prisma";
 import type { Prisma, Workspace } from "@/generated/prisma/client";
@@ -26,6 +31,14 @@ export type WorkspacePublic = {
 };
 
 export type WorkspaceSummary = Pick<WorkspacePublic, "id" | "name">;
+
+export type WorkspaceVtexConfig = {
+  account: string;
+  environment: VtexEnvironment;
+  appKey: string;
+  appToken: string;
+  siteUrl: string;
+};
 
 function toWorkspacePublic(row: Workspace): WorkspacePublic {
   return {
@@ -73,6 +86,99 @@ export async function findWorkspaceForUser(
     where: { id: workspaceId, userId },
   });
   return row ? toWorkspacePublic(row) : null;
+}
+
+export async function getWorkspaceVtexConfigForUser(
+  userId: string,
+  workspaceId: string,
+): Promise<WorkspaceVtexConfig> {
+  const row = await prisma.workspace.findFirst({
+    where: { id: workspaceId, userId },
+  });
+  if (!row) {
+    throw new Error("Loja não encontrada.");
+  }
+
+  assertVtexAccountFields({
+    vtexAccountName: row.vtexAccountName,
+    vtexEnvironment: row.vtexEnvironment,
+    vtexAppKey: row.vtexAppKeyEnc ? "present" : undefined,
+    vtexAppToken: row.vtexAppTokenEnc ? "present" : undefined,
+  });
+
+  if (!row.vtexAppKeyEnc || !row.vtexAppTokenEnc) {
+    throw new Error("Credenciais VTEX incompletas para esta loja.");
+  }
+
+  if (!row.vtexAccountName?.trim() || !row.vtexEnvironment?.trim()) {
+    throw new Error("Configure account name e environment VTEX desta loja.");
+  }
+
+  try {
+    const appKey = decryptSecret(row.vtexAppKeyEnc, workspaceId, "vtexAppKey");
+    const appToken = decryptSecret(
+      row.vtexAppTokenEnc,
+      workspaceId,
+      "vtexAppToken",
+    );
+
+    return {
+      account: row.vtexAccountName.trim(),
+      environment: row.vtexEnvironment as VtexEnvironment,
+      appKey,
+      appToken,
+      siteUrl: row.siteUrl,
+    };
+  } catch (error) {
+    if (error instanceof CredentialsCryptoError) {
+      throw error;
+    }
+    throw error;
+  }
+}
+
+export async function getWorkspaceMeasurementSecretsForUser(
+  userId: string,
+  workspaceId: string,
+): Promise<WorkspaceMeasurementSecrets> {
+  const row = await prisma.workspace.findFirst({
+    where: { id: workspaceId, userId },
+  });
+  if (!row) {
+    throw new Error("Loja não encontrada.");
+  }
+
+  let gaServiceAccount: WorkspaceMeasurementSecrets["gaServiceAccount"];
+  if (row.gaServiceAccountEnc) {
+    try {
+      const json = decryptSecret(
+        row.gaServiceAccountEnc,
+        workspaceId,
+        "gaServiceAccount",
+      );
+      gaServiceAccount = parseGaServiceAccountJson(json);
+    } catch (error) {
+      if (error instanceof CredentialsCryptoError) {
+        throw error;
+      }
+      throw new Error("Não foi possível ler a service account do Google.");
+    }
+  }
+
+  let clarityToken: string | undefined;
+  if (row.clarityTokenEnc) {
+    clarityToken = decryptSecret(
+      row.clarityTokenEnc,
+      workspaceId,
+      "clarityToken",
+    );
+  }
+
+  return {
+    siteUrl: row.siteUrl,
+    gaServiceAccount,
+    clarityToken,
+  };
 }
 
 export async function countWorkspacesForUser(userId: string): Promise<number> {

@@ -5,6 +5,7 @@ export const MAX_WORKSPACES_PER_USER = 3;
 export const VTEX_ENVIRONMENTS = [
   "vtexcommercestable",
   "vtexcommercebeta",
+  "myvtex",
 ] as const;
 
 export type VtexEnvironment = (typeof VTEX_ENVIRONMENTS)[number];
