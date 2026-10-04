@@ -109,6 +109,7 @@ export async function getWorkspaceOverview(
       );
       measurementResult = await runMeasurementCollect({
         secrets,
+        workspaceId,
         period: { start: period.start, end: period.end },
         sources: measurementSources.length
           ? measurementSources

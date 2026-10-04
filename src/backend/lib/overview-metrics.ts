@@ -1,3 +1,4 @@
+import { formatClarityCacheNote } from "@/backend/lib/clarity/clarity-cache-policy";
 import type { MeasurementCollectResult } from "@/backend/lib/measurement/schemas";
 import type { AnalyticsNormalized } from "@/backend/lib/normalized-adapters";
 import type { ClarityNormalized } from "@/backend/lib/normalized-adapters";
@@ -131,6 +132,25 @@ function vtexCollectError(vtex: VtexCollectResult | null): string | undefined {
   return orders?.status === "failed" ? orders.error : vtex?.dataGaps[0]?.reason;
 }
 
+function resolveClarityPeriodNote(
+  baseNote: string,
+  measurement: MeasurementCollectResult | null,
+): string {
+  const meta = measurement?.clarityCollectMeta;
+  if (!meta) {
+    return baseNote;
+  }
+  const cacheNote = formatClarityCacheNote({
+    fromCache: meta.fromCache,
+    stale: meta.stale,
+    collectedAt: new Date(meta.collectedAt),
+  });
+  if (!cacheNote) {
+    return baseNote;
+  }
+  return `${baseNote}. ${cacheNote}`;
+}
+
 export type BuildOverviewInput = {
   workspace: WorkspaceOverviewListItem;
   periodLabel: string;
@@ -181,6 +201,10 @@ export function buildOverviewDto(input: BuildOverviewInput): OverviewDTO {
   const analytics = analyticsFromMeasurement(input.measurement);
   const searchConsole = searchConsoleFromMeasurement(input.measurement);
   const clarity = clarityFromMeasurement(input.measurement);
+  const clarityPeriodNote = resolveClarityPeriodNote(
+    input.clarityPeriodNote,
+    input.measurement,
+  );
   const vtexMetrics = input.vtex?.metrics;
 
   const gaOk = sources.analytics.dot === "ok";
@@ -286,7 +310,7 @@ export function buildOverviewDto(input: BuildOverviewInput): OverviewDTO {
         device: d.device,
         sharePct: d.share_pct,
       })),
-      periodNote: input.clarityPeriodNote,
+      periodNote: clarityPeriodNote,
     };
   }
 
@@ -294,7 +318,7 @@ export function buildOverviewDto(input: BuildOverviewInput): OverviewDTO {
     workspaceId: workspace.id,
     workspaceName: workspace.name,
     periodLabel: input.periodLabel,
-    clarityPeriodNote: input.clarityPeriodNote,
+    clarityPeriodNote,
     collectedAt: input.collectedAt,
     sources,
     hero,

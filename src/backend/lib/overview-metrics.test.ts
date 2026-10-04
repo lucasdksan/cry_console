@@ -64,4 +64,31 @@ describe("overview-metrics", () => {
     expect(dto.sources["search-console"].dot).toBe("failed");
     expect(dto.vtexVisual?.orderCount).toBe(10);
   });
+
+  it("anexa nota de cache ao clarityPeriodNote", () => {
+    const dto = buildOverviewDto({
+      workspace: baseWorkspace,
+      periodLabel: "Últimos 30 dias",
+      clarityPeriodNote: "Clarity: últimos 3 dias (limite da API)",
+      collectedAt: "2026-01-01T00:00:00.000Z",
+      vtex: null,
+      measurement: {
+        collectedAt: "2026-01-01T00:00:00.000Z",
+        analytics: null,
+        searchConsole: null,
+        clarity: { sessions: 10, deadClicks: 1, quickBacks: 0 },
+        clarityCollectMeta: {
+          fromCache: true,
+          stale: false,
+          collectedAt: "2026-10-04T12:00:00.000Z",
+        },
+        sourceResults: [{ source: "clarity", status: "ok" }],
+        dataGaps: [],
+      },
+    });
+
+    expect(dto.clarityPeriodNote).toContain("limite da API");
+    expect(dto.clarityPeriodNote).toContain("cache de hoje");
+    expect(dto.clarityVisual?.periodNote).toBe(dto.clarityPeriodNote);
+  });
 });

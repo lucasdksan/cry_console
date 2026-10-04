@@ -1,3 +1,5 @@
+import { collectClarityWithCache } from "@/backend/lib/clarity/collect-clarity-cached";
+import { formatClarityCacheNote } from "@/backend/lib/clarity/clarity-cache-policy";
 import { collectClarity } from "@/backend/lib/clarity/clarity-collector";
 import { collectGa4Analytics } from "@/backend/lib/google/ga4-collector";
 import {
@@ -9,6 +11,7 @@ import {
 import { collectSearchConsole } from "@/backend/lib/google/gsc-collector";
 import { normalizeGscSiteUrl } from "@/backend/lib/google/gsc-site-url";
 import type {
+  ClarityCollectMetaDto,
   MeasurementCollectResult,
   MeasurementDataGap,
   MeasurementSource,
@@ -31,6 +34,7 @@ export type RunMeasurementCollectOptions = {
   secrets: WorkspaceMeasurementSecrets;
   period: MeasurementPeriod;
   sources?: MeasurementSource[];
+  workspaceId?: string;
   gaPropertyId?: string;
   gscSiteUrl?: string;
   brandKeyword?: string;
@@ -53,6 +57,7 @@ export async function runMeasurementCollect(
   let analytics: AnalyticsNormalized | null = null;
   let searchConsole: SearchConsoleNormalized | null = null;
   let clarity: ClarityNormalized | null = null;
+  let clarityCollectMeta: ClarityCollectMetaDto | undefined;
 
   const needsGoogle = sources.some(
     (s) => s === "analytics" || s === "search-console",
@@ -132,11 +137,40 @@ export async function runMeasurementCollect(
           if (!options.secrets.clarityToken?.trim()) {
             throw new Error("Token do Microsoft Clarity não configurado.");
           }
-          clarity = await collectClarity({
-            token: options.secrets.clarityToken.trim(),
-            period: options.period,
-            fetchFn,
-          });
+          const token = options.secrets.clarityToken.trim();
+          if (options.workspaceId) {
+            const cached = await collectClarityWithCache({
+              workspaceId: options.workspaceId,
+              token,
+              period: options.period,
+              fetchFn,
+            });
+            clarity = cached.data;
+            if (cached.meta) {
+              clarityCollectMeta = {
+                fromCache: cached.meta.fromCache,
+                stale: cached.meta.stale,
+                collectedAt: cached.meta.collectedAt.toISOString(),
+              };
+              const note = formatClarityCacheNote(cached.meta);
+              if (note) {
+                dataGaps.push({
+                  source: "clarity",
+                  reason: note,
+                  impact: "Dados Clarity servidos do cache local.",
+                });
+              }
+            }
+            if (cached.error && !clarity) {
+              throw new Error(cached.error);
+            }
+          } else {
+            clarity = await collectClarity({
+              token,
+              period: options.period,
+              fetchFn,
+            });
+          }
           sourceResults.push({ source, status: "ok" });
         }
       } catch (error) {
@@ -156,6 +190,7 @@ export async function runMeasurementCollect(
     analytics,
     searchConsole,
     clarity,
+    clarityCollectMeta,
     sourceResults,
     dataGaps,
   };

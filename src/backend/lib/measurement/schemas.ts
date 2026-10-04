@@ -48,11 +48,20 @@ export const measurementDataGapSchema = z.object({
 
 export type MeasurementDataGap = z.infer<typeof measurementDataGapSchema>;
 
+export const clarityCollectMetaSchema = z.object({
+  fromCache: z.boolean(),
+  stale: z.boolean(),
+  collectedAt: z.string(),
+});
+
+export type ClarityCollectMetaDto = z.infer<typeof clarityCollectMetaSchema>;
+
 export const measurementCollectResultSchema = z.object({
   collectedAt: z.string(),
   analytics: z.unknown().nullable(),
   searchConsole: z.unknown().nullable(),
   clarity: z.unknown().nullable(),
+  clarityCollectMeta: clarityCollectMetaSchema.optional(),
   sourceResults: z.array(measurementSourceResultSchema),
   dataGaps: z.array(measurementDataGapSchema),
 });
