@@ -18,6 +18,8 @@ type AvisoMetricCardProps = {
   periodType: "week" | "month";
   metric: AvisosMetricCard;
   sourceReady: boolean;
+  selected?: boolean;
+  onSelect?: () => void;
   onUpdated?: () => void;
 };
 
@@ -61,6 +63,28 @@ function statusLabel(status: AvisosMetricCard["status"]): string | null {
   }
 }
 
+function hitLabel(status: AvisosMetricCard["targetHitStatus"]): string | null {
+  if (status === "reached") {
+    return "Atingida";
+  }
+  if (status === "not_reached") {
+    return "Ainda não";
+  }
+  return null;
+}
+
+function hitVariant(
+  status: AvisosMetricCard["targetHitStatus"],
+): "default" | "secondary" | "destructive" | "outline" {
+  if (status === "reached") {
+    return "default";
+  }
+  if (status === "not_reached") {
+    return "destructive";
+  }
+  return "outline";
+}
+
 function statusVariant(
   status: AvisosMetricCard["status"],
 ): "default" | "secondary" | "destructive" | "outline" {
@@ -81,6 +105,8 @@ export function AvisoMetricCard({
   periodType,
   metric,
   sourceReady,
+  selected = false,
+  onSelect,
   onUpdated,
 }: AvisoMetricCardProps) {
   const [editing, setEditing] = useState(!metric.hasTarget);
@@ -110,6 +136,11 @@ export function AvisoMetricCard({
   const bannerError = saveState.error ?? clearState.error;
   const bannerSuccess = saveState.success ?? clearState.success;
   const statusText = statusLabel(metric.status);
+  const hitText = hitLabel(metric.targetHitStatus);
+  const cardRing = selected ? "ring-2 ring-primary/60" : "border-border/60";
+  const cardInteractive = onSelect
+    ? "cursor-pointer transition hover:border-primary/40"
+    : "";
 
   if (!sourceReady) {
     return (
@@ -141,7 +172,7 @@ export function AvisoMetricCard({
           <input type="hidden" name="workspaceId" value={workspaceId} />
           <input type="hidden" name="metricKey" value={metric.key} />
           <input type="hidden" name="periodType" value={periodType} />
-          <FormField label="Meta" htmlFor={`target-${metric.key}`}>
+          <FormField id={`target-${metric.key}`} label="Meta">
             <Input
               id={`target-${metric.key}`}
               name="targetValue"
@@ -176,19 +207,43 @@ export function AvisoMetricCard({
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-[var(--radius-lg)] border border-border/60 p-4">
+    <div
+      role={onSelect ? "button" : undefined}
+      tabIndex={onSelect ? 0 : undefined}
+      onClick={onSelect}
+      onKeyDown={(event) => {
+        if (!onSelect) {
+          return;
+        }
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
+      className={`flex flex-col gap-3 rounded-[var(--radius-lg)] border p-4 ${cardRing} ${cardInteractive}`}
+    >
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="flex flex-col gap-1">
           <p className="text-sm font-medium">{metric.label}</p>
-          {statusText ? (
-            <Badge variant={statusVariant(metric.status)}>{statusText}</Badge>
-          ) : null}
+          <div className="flex flex-wrap gap-1">
+            {hitText ? (
+              <Badge variant={hitVariant(metric.targetHitStatus)}>
+                {hitText}
+              </Badge>
+            ) : null}
+            {statusText ? (
+              <Badge variant={statusVariant(metric.status)}>{statusText}</Badge>
+            ) : null}
+          </div>
         </div>
         <Button
           type="button"
           variant="ghost"
           size="sm"
-          onClick={() => setEditing(true)}
+          onClick={(event) => {
+            event.stopPropagation();
+            setEditing(true);
+          }}
         >
           Editar meta
         </Button>
@@ -227,7 +282,10 @@ export function AvisoMetricCard({
           </dd>
         </div>
       </dl>
-      <form action={clearAction}>
+      <form
+        action={clearAction}
+        onClick={(event) => event.stopPropagation()}
+      >
         <input type="hidden" name="workspaceId" value={workspaceId} />
         <input type="hidden" name="metricKey" value={metric.key} />
         <input type="hidden" name="periodType" value={periodType} />

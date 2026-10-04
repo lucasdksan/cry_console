@@ -1,10 +1,13 @@
 "use client";
 
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
+
+import type { WorkspaceMetricKey } from "@/generated/prisma/client";
 
 import { getWorkspaceAvisos } from "@/backend/controllers/alert.controller";
 import type { WorkspaceAvisosDTO } from "@/backend/lib/workspace-avisos-dto";
 import { AvisoMetricCard } from "@/frontend/components/molecules/aviso-metric-card";
+import { AvisoMetricChart } from "@/frontend/components/organisms/aviso-metric-chart";
 import { SourceErrorPanel } from "@/frontend/components/molecules/source-error-panel";
 import {
   Card,
@@ -46,13 +49,32 @@ function hasAnyConfiguredSource(data: WorkspaceAvisosDTO): boolean {
   return data.sources.some((source) => source.status !== "missing");
 }
 
+function defaultChartMetricKey(data: WorkspaceAvisosDTO): WorkspaceMetricKey {
+  for (const source of data.sources) {
+    for (const metric of source.metrics) {
+      if (metric.hasTarget) {
+        return metric.key;
+      }
+    }
+  }
+  return data.sources[0]?.metrics[0]?.key ?? "vtex_revenue";
+}
+
 export function AvisosBoard({ workspaceId, initial }: AvisosBoardProps) {
   const [periodType, setPeriodType] = useState<"week" | "month">(
     initial.periodType,
   );
   const [data, setData] = useState(initial);
+  const [chartMetricKey, setChartMetricKey] = useState<WorkspaceMetricKey>(
+    () => defaultChartMetricKey(initial),
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const chartMetrics = useMemo(
+    () => data.sources.flatMap((source) => source.metrics),
+    [data],
+  );
 
   const load = useCallback(
     (nextPeriod: "week" | "month") => {
@@ -64,6 +86,15 @@ export function AvisosBoard({ workspaceId, initial }: AvisosBoardProps) {
           return;
         }
         setData(result.data);
+        setChartMetricKey((prev) => {
+          const stillExists = result.data.sources.some((source) =>
+            source.metrics.some((metric) => metric.key === prev),
+          );
+          if (stillExists) {
+            return prev;
+          }
+          return defaultChartMetricKey(result.data);
+        });
       });
     },
     [workspaceId],
@@ -115,6 +146,14 @@ export function AvisosBoard({ workspaceId, initial }: AvisosBoardProps) {
 
           {error ? (
             <p className="text-sm text-destructive">{error}</p>
+          ) : null}
+
+          {!pending && chartMetrics.length > 0 ? (
+            <AvisoMetricChart
+              metrics={chartMetrics}
+              selectedKey={chartMetricKey}
+              onSelectKey={setChartMetricKey}
+            />
           ) : null}
 
           {pending ? (
@@ -173,6 +212,8 @@ export function AvisosBoard({ workspaceId, initial }: AvisosBoardProps) {
                             periodType={periodType}
                             metric={metric}
                             sourceReady={sourceReady(source.status)}
+                            selected={chartMetricKey === metric.key}
+                            onSelect={() => setChartMetricKey(metric.key)}
                             onUpdated={() => load(periodType)}
                           />
                         ))}
