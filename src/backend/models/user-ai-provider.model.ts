@@ -1,5 +1,6 @@
 import {
   CredentialsCryptoError,
+  decryptUserAiProviderSecret,
   encryptUserAiProviderSecret,
 } from "@/backend/lib/credentials-crypto";
 import {
@@ -15,6 +16,8 @@ export type UserAiProviderPublic = {
   providerKey: AiProviderKey;
   label: string;
   defaultModel: string | null;
+  baseUrl: string | null;
+  isDefault: boolean;
   hasApiToken: boolean;
 };
 
@@ -23,9 +26,19 @@ export type UserAiProvidersPublic = {
   availableToAdd: { providerKey: AiProviderKey; label: string }[];
 };
 
+export type UserAiProviderCredentials = {
+  providerKey: AiProviderKey;
+  defaultModel: string | null;
+  baseUrl: string | null;
+  isDefault: boolean;
+  apiToken: string;
+};
+
 function toProviderPublic(row: {
   providerKey: string;
   defaultModel: string | null;
+  baseUrl: string | null;
+  isDefault: boolean;
   apiTokenEnc: string | null;
 }): UserAiProviderPublic | null {
   if (!isAiProviderKey(row.providerKey)) {
@@ -35,9 +48,19 @@ function toProviderPublic(row: {
     providerKey: row.providerKey,
     label: labelForAiProvider(row.providerKey),
     defaultModel: row.defaultModel,
+    baseUrl: row.baseUrl,
+    isDefault: row.isDefault,
     hasApiToken: Boolean(row.apiTokenEnc),
   };
 }
+
+const providerSelect = {
+  providerKey: true,
+  defaultModel: true,
+  baseUrl: true,
+  isDefault: true,
+  apiTokenEnc: true,
+} as const;
 
 export async function listUserAiProvidersPublic(
   userId: string,
@@ -45,11 +68,7 @@ export async function listUserAiProvidersPublic(
   const rows = await prisma.userAiProvider.findMany({
     where: { userId },
     orderBy: { providerKey: "asc" },
-    select: {
-      providerKey: true,
-      defaultModel: true,
-      apiTokenEnc: true,
-    },
+    select: providerSelect,
   });
 
   const configuredKeys = new Set<string>();
@@ -75,6 +94,62 @@ export async function listUserAiProvidersPublic(
   return { providers, availableToAdd };
 }
 
+export async function listUserAiProvidersForRouting(userId: string) {
+  const rows = await prisma.userAiProvider.findMany({
+    where: { userId },
+    select: providerSelect,
+  });
+
+  const providers: UserAiProviderPublic[] = [];
+  for (const row of rows) {
+    const pub = toProviderPublic(row);
+    if (pub) {
+      providers.push(pub);
+    }
+  }
+  return providers;
+}
+
+export async function loadUserAiProviderCredentials(
+  userId: string,
+  providerKey: AiProviderKey,
+): Promise<UserAiProviderCredentials | null> {
+  const row = await prisma.userAiProvider.findUnique({
+    where: { userId_providerKey: { userId, providerKey } },
+    select: {
+      providerKey: true,
+      defaultModel: true,
+      baseUrl: true,
+      isDefault: true,
+      apiTokenEnc: true,
+    },
+  });
+
+  if (!row?.apiTokenEnc || !isAiProviderKey(row.providerKey)) {
+    return null;
+  }
+
+  try {
+    const apiToken = decryptUserAiProviderSecret(
+      row.apiTokenEnc,
+      userId,
+      row.providerKey,
+    );
+    return {
+      providerKey: row.providerKey,
+      defaultModel: row.defaultModel,
+      baseUrl: row.baseUrl,
+      isDefault: row.isDefault,
+      apiToken,
+    };
+  } catch (error) {
+    if (error instanceof CredentialsCryptoError) {
+      throw error;
+    }
+    throw error;
+  }
+}
+
 type ApiTokenUpdate =
   | { action: "set"; value: string }
   | { action: "keep" }
@@ -85,6 +160,8 @@ export async function upsertUserAiProviderForUser(
   input: {
     providerKey: AiProviderKey;
     defaultModel: string | null;
+    baseUrl: string | null;
+    isDefault: boolean;
     apiToken: ApiTokenUpdate;
   },
 ): Promise<UserAiProvidersPublic> {
@@ -118,26 +195,37 @@ export async function upsertUserAiProviderForUser(
 
   const data = {
     defaultModel: input.defaultModel,
+    baseUrl: input.baseUrl,
+    isDefault: input.isDefault,
     ...(apiTokenEnc !== undefined ? { apiTokenEnc } : {}),
   };
 
-  if (existing) {
-    await prisma.userAiProvider.update({
-      where: {
-        userId_providerKey: { userId, providerKey: input.providerKey },
-      },
-      data,
-    });
-  } else {
-    await prisma.userAiProvider.create({
-      data: {
-        userId,
-        providerKey: input.providerKey,
-        ...data,
-        apiTokenEnc: apiTokenEnc ?? null,
-      },
-    });
-  }
+  await prisma.$transaction(async (tx) => {
+    if (input.isDefault) {
+      await tx.userAiProvider.updateMany({
+        where: { userId },
+        data: { isDefault: false },
+      });
+    }
+
+    if (existing) {
+      await tx.userAiProvider.update({
+        where: {
+          userId_providerKey: { userId, providerKey: input.providerKey },
+        },
+        data,
+      });
+    } else {
+      await tx.userAiProvider.create({
+        data: {
+          userId,
+          providerKey: input.providerKey,
+          ...data,
+          apiTokenEnc: apiTokenEnc ?? null,
+        },
+      });
+    }
+  });
 
   return listUserAiProvidersPublic(userId);
 }

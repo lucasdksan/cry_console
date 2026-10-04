@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  validateAiBaseUrlInput,
   validateAiModelInput,
   validateAiTokenInput,
 } from "@/backend/lib/account-settings-policy";
@@ -35,6 +36,12 @@ describe("account-settings-policy", () => {
   it("rejeita token entre aspas", () => {
     expect(validateAiTokenInput('"secret"')).toMatchObject({
       error: expect.any(String),
+    });
+  });
+
+  it("normaliza URL base removendo barra final", () => {
+    expect(validateAiBaseUrlInput("https://api.exemplo/v1/")).toEqual({
+      value: "https://api.exemplo/v1",
     });
   });
 });

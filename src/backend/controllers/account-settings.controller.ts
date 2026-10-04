@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/backend/auth";
 import { isAiProviderKey } from "@/backend/lib/ai-provider-catalog";
 import {
+  validateAiBaseUrlInput,
   validateAiModelInput,
   validateAiTokenInput,
 } from "@/backend/lib/account-settings-policy";
@@ -90,11 +91,27 @@ export async function saveUserAiProvider(
   }
 
   const hasApiToken = formData.get("hasApiToken") === "1";
+  const isDefault = formData.get("isDefault") === "1";
   const modelRaw = optionalTrimmed(formData.get("defaultModel"));
   const modelResult = validateAiModelInput(modelRaw);
   if (modelResult.error) {
     return {
       fieldErrors: { defaultModel: [modelResult.error] },
+    };
+  }
+
+  const baseUrlRaw = optionalTrimmed(formData.get("baseUrl"));
+  const baseUrlResult = validateAiBaseUrlInput(baseUrlRaw);
+  if (baseUrlResult.error) {
+    return {
+      fieldErrors: { baseUrl: [baseUrlResult.error] },
+    };
+  }
+  if (providerKeyRaw === "custom" && !baseUrlResult.value) {
+    return {
+      fieldErrors: {
+        baseUrl: ["Informe a URL base da API compatível com OpenAI."],
+      },
     };
   }
 
@@ -112,6 +129,8 @@ export async function saveUserAiProvider(
     const providers = await upsertUserAiProviderForUser(userId, {
       providerKey: providerKeyRaw,
       defaultModel: modelResult.value,
+      baseUrl: providerKeyRaw === "custom" ? baseUrlResult.value : null,
+      isDefault,
       apiToken: apiTokenUpdate,
     });
     return { success: "Provedor salvo.", providers };

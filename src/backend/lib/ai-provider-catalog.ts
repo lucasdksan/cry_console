@@ -34,7 +34,7 @@ export const AI_PROVIDER_CATALOG: Record<AiProviderKey, AiProviderCatalogEntry> 
     google: {
       label: "Google Gemini",
       description: "Gemini via Google AI Studio ou Vertex.",
-      modelSuggestions: ["gemini-2.5-pro", "gemini-2.5-flash"],
+      modelSuggestions: ["gemini-3.8-flash", "gemini-3.5-flash"],
     },
     custom: {
       label: "Outro provedor",

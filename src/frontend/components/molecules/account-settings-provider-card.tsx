@@ -60,7 +60,7 @@ export function AccountSettingsProviderCard({
   const bannerSuccess =
     state.success ?? removeState.success ?? tokenState.success;
   const configured = provider.hasApiToken;
-  const formKey = `${provider.defaultModel ?? ""}-${configured ? "1" : "0"}`;
+  const formKey = `${provider.defaultModel ?? ""}-${provider.baseUrl ?? ""}-${provider.isDefault ? "1" : "0"}-${configured ? "1" : "0"}`;
 
   useEffect(() => {
     const next =
@@ -80,6 +80,9 @@ export function AccountSettingsProviderCard({
       <CardHeader>
         <div className="flex flex-wrap items-center gap-2">
           <CardTitle className="font-heading text-base">{provider.label}</CardTitle>
+          {provider.isDefault ? (
+            <Badge variant="default">Padrão</Badge>
+          ) : null}
           {configured ? (
             <Badge variant="secondary">Token configurado</Badge>
           ) : (
@@ -135,6 +138,35 @@ export function AccountSettingsProviderCard({
               ))}
             </datalist>
           ) : null}
+
+          {provider.providerKey === "custom" ? (
+            <FormField
+              id={`${provider.providerKey}-baseUrl`}
+              label="URL base da API"
+              error={state.fieldErrors?.baseUrl?.[0]}
+            >
+              <Input
+                id={`${provider.providerKey}-baseUrl`}
+                name="baseUrl"
+                type="url"
+                defaultValue={provider.baseUrl ?? ""}
+                placeholder="https://gateway.exemplo/v1"
+                autoComplete="off"
+                className="rounded-[var(--radius-md)] border-border bg-background"
+              />
+            </FormField>
+          ) : null}
+
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+            <input
+              type="checkbox"
+              name="isDefault"
+              value="1"
+              defaultChecked={provider.isDefault}
+              className="size-4 rounded border-border accent-primary"
+            />
+            Usar como provedor padrão
+          </label>
 
           <Separator />
 
