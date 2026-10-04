@@ -61,4 +61,30 @@ describe("collectGa4Analytics", () => {
     expect(result?.devices?.[0]?.share_pct).toBeCloseTo(70, 1);
     expect(fetchFn).toHaveBeenCalledTimes(3);
   });
+
+  it("não envia endDate futuro no runReport", async () => {
+    const fetchFn = vi.fn(async () => Response.json({ rows: [] }));
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "America/Sao_Paulo",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+
+    await collectGa4Analytics({
+      accessToken: "token",
+      propertyId: "123456789",
+      period: { start: "2026-10-01", end: "2099-12-31" },
+      fetchFn,
+    });
+
+    expect(fetchFn).toHaveBeenCalled();
+    const body = JSON.parse(String(fetchFn.mock.calls[0]?.[1]?.body ?? "{}")) as {
+      currencyCode?: string;
+      dateRanges?: Array<{ startDate?: string; endDate?: string }>;
+    };
+    expect(body.dateRanges?.[0]?.endDate).toBe(today);
+    expect(body.dateRanges?.[0]?.startDate).toBe("2026-10-01");
+    expect(body.currencyCode).toBe("BRL");
+  });
 });

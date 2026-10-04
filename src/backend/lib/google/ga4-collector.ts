@@ -1,5 +1,5 @@
 import type { FetchFn } from "@/backend/lib/google/google-auth";
-import { toGoogleApiDate } from "@/backend/lib/google/period";
+import { clampGoogleEndDate, toGoogleApiDate } from "@/backend/lib/google/period";
 import { adaptAnalytics } from "@/backend/lib/normalized-adapters";
 import type { AnalyticsNormalized } from "@/backend/lib/normalized-adapters";
 
@@ -55,9 +55,11 @@ export async function collectGa4Analytics(
   input: CollectGa4Input,
 ): Promise<AnalyticsNormalized | null> {
   const fetchFn = input.fetchFn ?? fetch;
+  const startDate = toGoogleApiDate(input.period.start);
+  const endDate = clampGoogleEndDate(input.period.end);
   const dateRange = {
-    startDate: toGoogleApiDate(input.period.start),
-    endDate: toGoogleApiDate(input.period.end),
+    startDate: startDate <= endDate ? startDate : endDate,
+    endDate,
   };
 
   const [totalsReport, channelReport, deviceReport] = await Promise.all([
@@ -66,6 +68,7 @@ export async function collectGa4Analytics(
       input.propertyId,
       {
         dateRanges: [dateRange],
+        currencyCode: "BRL",
         metrics: [
           { name: "sessions" },
           { name: "activeUsers" },
@@ -83,6 +86,7 @@ export async function collectGa4Analytics(
       input.propertyId,
       {
         dateRanges: [dateRange],
+        currencyCode: "BRL",
         dimensions: [{ name: "sessionDefaultChannelGroup" }],
         metrics: [
           { name: "sessions" },

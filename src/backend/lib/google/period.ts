@@ -1,8 +1,30 @@
+const SP_TZ = "America/Sao_Paulo";
+
 export function toGoogleApiDate(iso: string): string {
   if (iso.length >= 10 && iso[4] === "-" && iso[7] === "-") {
     return iso.slice(0, 10);
   }
   return new Date(iso).toISOString().slice(0, 10);
+}
+
+function spTodayYmd(ref: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: SP_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(ref);
+}
+
+/** GA4 recusa métricas monetárias com endDate futuro (câmbio inexistente). */
+export function clampGoogleEndDate(
+  end: string,
+  today: string | Date = new Date(),
+): string {
+  const endYmd = toGoogleApiDate(end);
+  const todayYmd =
+    typeof today === "string" ? toGoogleApiDate(today) : spTodayYmd(today);
+  return endYmd <= todayYmd ? endYmd : todayYmd;
 }
 
 export function daysInclusive(start: string, end: string): number {

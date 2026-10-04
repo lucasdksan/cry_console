@@ -1,5 +1,5 @@
 import type { FetchFn } from "@/backend/lib/google/google-auth";
-import { toGoogleApiDate } from "@/backend/lib/google/period";
+import { clampGoogleEndDate, toGoogleApiDate } from "@/backend/lib/google/period";
 import {
   pickGscSiteUrl,
   type GscSiteEntry,
@@ -102,8 +102,9 @@ export async function collectSearchConsole(
   input: CollectGscInput,
 ): Promise<SearchConsoleNormalized | null> {
   const fetchFn = input.fetchFn ?? fetch;
-  const startDate = toGoogleApiDate(input.period.start);
-  const endDate = toGoogleApiDate(input.period.end);
+  const startDateRaw = toGoogleApiDate(input.period.start);
+  const endDate = clampGoogleEndDate(input.period.end);
+  const startDate = startDateRaw <= endDate ? startDateRaw : endDate;
   const sites = await listSearchConsoleSites(input.accessToken, fetchFn);
   const siteUrl = pickGscSiteUrl(input.siteUrl, sites);
   if (!siteUrl) {
