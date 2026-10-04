@@ -30,6 +30,8 @@ model UserAiProvider {
   userId       String
   providerKey  String
   defaultModel String?
+  baseUrl      String?
+  isDefault    Boolean  @default(false)
   apiTokenEnc  String?  @db.Text
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -60,9 +62,93 @@ model Workspace {
   user           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   activeForUsers User[]                  @relation("ActiveWorkspace")
   observability  WorkspaceObservability?
+  metricTargets  WorkspaceMetricTarget[]
+  metricSnapshots WorkspaceMetricSnapshot[]
+  claritySnapshots WorkspaceClaritySnapshot[]
 
   @@unique([userId, nameKey])
   @@index([userId])
+}
+
+enum WorkspaceMetricPeriodType {
+  week
+  month
+}
+
+enum WorkspaceMetricKey {
+  vtex_revenue
+  vtex_orders
+  ga4_sessions
+  ga4_conversion_pct
+  gsc_clicks
+}
+
+enum WorkspaceMetricSourceStatus {
+  ok
+  failed
+  missing
+}
+
+model WorkspaceMetricTarget {
+  id           String                    @id @default(cuid())
+  workspaceId  String
+  metricKey    WorkspaceMetricKey
+  periodType   WorkspaceMetricPeriodType
+  targetValue  Decimal                   @db.Decimal(18, 4)
+  createdAt    DateTime                  @default(now())
+  updatedAt    DateTime                  @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, metricKey, periodType])
+  @@index([workspaceId])
+}
+
+model WorkspaceMetricSnapshot {
+  id                    String                    @id @default(cuid())
+  workspaceId           String
+  periodType            WorkspaceMetricPeriodType
+  periodStart           DateTime
+  periodEnd             DateTime
+  capturedOn            DateTime                  @db.Date
+  collectedAt           DateTime
+  vtexRevenue           Decimal?                  @db.Decimal(18, 4)
+  vtexOrders            Int?
+  ga4Sessions           Int?
+  ga4ConversionPct      Decimal?                  @db.Decimal(8, 4)
+  gscClicks             Int?
+  vtexStatus            WorkspaceMetricSourceStatus
+  ga4Status             WorkspaceMetricSourceStatus
+  gscStatus             WorkspaceMetricSourceStatus
+  vtexError             String?                   @db.Text
+  ga4Error              String?                   @db.Text
+  gscError              String?                   @db.Text
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, periodType, capturedOn])
+  @@index([workspaceId, periodType])
+}
+
+model WorkspaceClaritySnapshot {
+  id            String                      @id @default(cuid())
+  workspaceId   String
+  capturedOn    DateTime                    @db.Date
+  numOfDays     Int
+  collectedAt   DateTime
+  fetchedFromApi Boolean                    @default(false)
+  status        WorkspaceMetricSourceStatus
+  payloadJson   Json?
+  error         String?                     @db.Text
+  createdAt     DateTime                    @default(now())
+  updatedAt     DateTime                    @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, capturedOn, numOfDays])
+  @@index([workspaceId])
 }
 
 enum ObservabilityPageType {
