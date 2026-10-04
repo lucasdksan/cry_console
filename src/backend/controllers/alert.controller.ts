@@ -16,11 +16,17 @@ import {
   runMeasurementCollect,
   type MeasurementSource,
 } from "@/backend/lib/measurement";
+import { syncWorkspaceMetricDays } from "@/backend/lib/workspace-metric-daily-sync";
+import {
+  calendarDayFromYmd,
+  ymdFromPeriodIso,
+} from "@/backend/lib/workspace-period";
 import {
   assertWorkspaceOwnedByUser,
   deleteMetricTarget,
   findMetricSnapshotForDay,
   findLatestMetricSnapshotBeforeDay,
+  listMetricDaysForRange,
   listMetricTargetsForWorkspace,
   upsertMetricSnapshot,
   upsertMetricTarget,
@@ -36,6 +42,8 @@ import {
   isVtexConfigured,
 } from "@/backend/lib/overview-status";
 import { runVtexCollect } from "@/backend/lib/vtex/run-collectors";
+import type { VtexCollectResult, VtexOrder } from "@/backend/lib/vtex/schemas";
+import type { MetricDayRow } from "@/backend/models/workspace-metric.model";
 import type { WorkspaceMetricKey } from "@/generated/prisma/client";
 
 const SNAPSHOT_CACHE_MS = 15 * 60 * 1000;
@@ -80,17 +88,39 @@ async function requireUserId(): Promise<string> {
   return session.user.id;
 }
 
+type LoadSnapshotForPeriodResult =
+  | { error: string }
+  | {
+      workspace: NonNullable<
+        Awaited<ReturnType<typeof findWorkspaceForUser>>
+      >;
+      period: ReturnType<typeof resolveCalendarPeriod>;
+      snapshot: Awaited<ReturnType<typeof findMetricSnapshotForDay>>;
+      snapshotStale: boolean;
+      metricDays: MetricDayRow[];
+    };
+
 async function loadSnapshotForPeriod(
   userId: string,
   workspaceId: string,
   periodType: "week" | "month",
-) {
+): Promise<LoadSnapshotForPeriodResult> {
   const workspace = await findWorkspaceForUser(userId, workspaceId);
   if (!workspace) {
     return { error: "Loja não encontrada." as const };
   }
 
   const period = resolveCalendarPeriod(periodType);
+  const periodStartDay = calendarDayFromYmd(ymdFromPeriodIso(period.start));
+  const periodEndDay = calendarDayFromYmd(
+    ymdFromPeriodIso(period.collectEnd),
+  );
+  const existingDays = await listMetricDaysForRange(
+    workspaceId,
+    periodStartDay,
+    periodEndDay,
+  );
+
   const existing = await findMetricSnapshotForDay(
     workspaceId,
     periodType,
@@ -103,12 +133,15 @@ async function loadSnapshotForPeriod(
     SNAPSHOT_CACHE_MS,
   );
 
-  if (cacheFresh) {
+  const needsCollect = !cacheFresh || existingDays.length === 0;
+
+  if (cacheFresh && !needsCollect) {
     return {
       workspace,
       period,
       snapshot: existing,
       snapshotStale: false,
+      metricDays: existingDays,
     };
   }
 
@@ -120,7 +153,8 @@ async function loadSnapshotForPeriod(
     measurementSources.push("search-console");
   }
 
-  let vtexResult: Awaited<ReturnType<typeof runVtexCollect>> | null = null;
+  let vtexResult: VtexCollectResult | null = null;
+  let vtexOrdersCollected: VtexOrder[] | null = null;
   let vtexError: string | undefined;
   let measurementResult: Awaited<ReturnType<typeof runMeasurementCollect>> | null =
     null;
@@ -131,7 +165,7 @@ async function loadSnapshotForPeriod(
     }
     try {
       const config = await getWorkspaceVtexConfigForUser(userId, workspaceId);
-      vtexResult = await runVtexCollect({
+      const collected = await runVtexCollect({
         config: {
           account: config.account,
           environment: config.environment,
@@ -142,6 +176,8 @@ async function loadSnapshotForPeriod(
         period: { start: period.start, end: period.collectEnd },
         collectors: ["orders"],
       });
+      vtexResult = collected;
+      vtexOrdersCollected = collected.normalized.orders;
     } catch (error) {
       vtexError =
         error instanceof Error
@@ -221,11 +257,42 @@ async function loadSnapshotForPeriod(
     }
   }
 
+  const collectedAt = snapshot?.collectedAt ?? new Date();
+
+  try {
+    const secrets = await getWorkspaceMeasurementSecretsForUser(
+      userId,
+      workspaceId,
+    );
+    await syncWorkspaceMetricDays({
+      workspaceId,
+      period,
+      collectedAt,
+      siteUrl: workspace.siteUrl,
+      gaServiceAccount: secrets.gaServiceAccount,
+      gaPropertyId: workspace.gaPropertyId ?? undefined,
+      vtexOrders: vtexOrdersCollected,
+      vtexStatus: extracted.vtexStatus,
+      ga4Status: extracted.ga4Status,
+      gscStatus: extracted.gscStatus,
+      existingDays,
+    });
+  } catch {
+    // Gráfico pode ficar incompleto; cards continuam com snapshot.
+  }
+
+  const metricDays = await listMetricDaysForRange(
+    workspaceId,
+    periodStartDay,
+    periodEndDay,
+  );
+
   return {
     workspace,
     period,
     snapshot,
     snapshotStale: allFailed && Boolean(existing ?? snapshot),
+    metricDays,
   };
 }
 
@@ -250,6 +317,7 @@ export async function getWorkspaceAvisos(
     targets,
     snapshot: loaded.snapshot,
     snapshotStale: loaded.snapshotStale,
+    metricDays: loaded.metricDays,
   });
 
   return { ok: true, data };

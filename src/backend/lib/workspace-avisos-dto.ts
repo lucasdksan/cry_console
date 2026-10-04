@@ -9,7 +9,17 @@ import {
   type AlertPaceStatus,
 } from "@/backend/lib/workspace-alert-status";
 import type { WorkspaceCalendarPeriod } from "@/backend/lib/workspace-period";
-import type { MetricSnapshotRow, MetricTargetRow } from "@/backend/models/workspace-metric.model";
+import {
+  buildMetricCumulativeSeries,
+  computeMetricTargetHitStatus,
+  type MetricSeriesPoint,
+  type MetricTargetHitStatus,
+} from "@/backend/lib/workspace-metric-series";
+import type {
+  MetricDayRow,
+  MetricSnapshotRow,
+  MetricTargetRow,
+} from "@/backend/models/workspace-metric.model";
 import type { WorkspaceMetricKey } from "@/generated/prisma/client";
 import type { WorkspaceMetricSourceStatus } from "@/generated/prisma/client";
 
@@ -26,6 +36,8 @@ export type AvisosMetricCard = {
   projection: number | null;
   status: AlertPaceStatus | null;
   hasTarget: boolean;
+  targetHitStatus: MetricTargetHitStatus;
+  series: MetricSeriesPoint[];
 };
 
 export type AvisosSourceBlock = {
@@ -60,11 +72,20 @@ function sourceStatusFromSnapshot(
 ): { status: WorkspaceMetricSourceStatus; error: string | null } {
   switch (source) {
     case "vtex":
-      return { status: snapshot.vtexStatus, error: snapshot.vtexError };
+      return {
+        status: snapshot.vtexStatus,
+        error: snapshot.vtexError ?? null,
+      };
     case "ga4":
-      return { status: snapshot.ga4Status, error: snapshot.ga4Error };
+      return {
+        status: snapshot.ga4Status,
+        error: snapshot.ga4Error ?? null,
+      };
     case "gsc":
-      return { status: snapshot.gscStatus, error: snapshot.gscError };
+      return {
+        status: snapshot.gscStatus,
+        error: snapshot.gscError ?? null,
+      };
   }
 }
 
@@ -87,9 +108,16 @@ export function buildWorkspaceAvisosDto(input: {
   targets: MetricTargetRow[];
   snapshot: MetricSnapshotRow | null;
   snapshotStale: boolean;
+  metricDays: MetricDayRow[];
 }): WorkspaceAvisosDTO {
-  const { periodType, period, targets, snapshot } = input;
+  const { periodType, period, targets, snapshot, metricDays } = input;
   const collectedAt = snapshot?.collectedAt.toISOString() ?? null;
+
+  const sourceStatuses = {
+    vtex: snapshot?.vtexStatus ?? ("missing" as const),
+    ga4: snapshot?.ga4Status ?? ("missing" as const),
+    gsc: snapshot?.gscStatus ?? ("missing" as const),
+  };
 
   const metricsBySource = new Map<AvisosSourceKey, AvisosMetricCard[]>();
   for (const def of METRIC_DEFINITIONS) {
@@ -127,6 +155,14 @@ export function buildWorkspaceAvisosDto(input: {
           : null,
       status,
       hasTarget: target !== null,
+      targetHitStatus: computeMetricTargetHitStatus({ current, target }),
+      series: buildMetricCumulativeSeries({
+        metricKey: def.key,
+        period,
+        days: metricDays,
+        sourceStatuses,
+        terminalValue: current,
+      }),
     };
 
     const list = metricsBySource.get(def.source) ?? [];

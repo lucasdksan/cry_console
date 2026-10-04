@@ -135,3 +135,24 @@ export function resolveCalendarPeriod(
 }
 
 export { spYmd as spCalendarYmd };
+
+export function ymdFromPeriodIso(iso: string): string {
+  return iso.slice(0, 10);
+}
+
+export function calendarDayFromYmd(ymd: string): Date {
+  return new Date(`${ymd}T00:00:00.000Z`);
+}
+
+export function enumerateCalendarDaysInclusive(
+  startYmd: string,
+  endYmd: string,
+): string[] {
+  const days: string[] = [];
+  let cursor = startYmd;
+  while (cursor <= endYmd) {
+    days.push(cursor);
+    cursor = addDaysYmd(cursor, 1);
+  }
+  return days;
+}

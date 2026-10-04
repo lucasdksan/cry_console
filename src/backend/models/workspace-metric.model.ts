@@ -1,5 +1,6 @@
 import { prisma } from "@/backend/models/prisma";
 import type {
+  WorkspaceMetricDay,
   WorkspaceMetricKey,
   WorkspaceMetricPeriodType,
   WorkspaceMetricSnapshot,
@@ -37,6 +38,21 @@ export type MetricSnapshotUpsertInput = {
 };
 
 export type MetricSnapshotRow = MetricSnapshotUpsertInput & {
+  id: string;
+};
+
+export type MetricDayUpsertInput = {
+  workspaceId: string;
+  calendarDay: Date;
+  collectedAt: Date;
+  vtexRevenue: number | null;
+  vtexOrders: number | null;
+  ga4Sessions: number | null;
+  ga4Purchases: number | null;
+  gscClicks: number | null;
+};
+
+export type MetricDayRow = MetricDayUpsertInput & {
   id: string;
 };
 
@@ -223,4 +239,83 @@ export async function upsertMetricSnapshot(
     },
   });
   return snapshotToRow(row);
+}
+
+function metricDayToRow(row: WorkspaceMetricDay): MetricDayRow {
+  return {
+    id: row.id,
+    workspaceId: row.workspaceId,
+    calendarDay: row.calendarDay,
+    collectedAt: row.collectedAt,
+    vtexRevenue: row.vtexRevenue !== null ? Number(row.vtexRevenue) : null,
+    vtexOrders: row.vtexOrders,
+    ga4Sessions: row.ga4Sessions,
+    ga4Purchases: row.ga4Purchases,
+    gscClicks: row.gscClicks,
+  };
+}
+
+export async function listMetricDaysForRange(
+  workspaceId: string,
+  startDay: Date,
+  endDay: Date,
+): Promise<MetricDayRow[]> {
+  const rows = await prisma.workspaceMetricDay.findMany({
+    where: {
+      workspaceId,
+      calendarDay: { gte: startDay, lte: endDay },
+    },
+    orderBy: { calendarDay: "asc" },
+  });
+  return rows.map(metricDayToRow);
+}
+
+export async function countMetricDaysForWorkspace(
+  workspaceId: string,
+): Promise<number> {
+  return prisma.workspaceMetricDay.count({ where: { workspaceId } });
+}
+
+export async function upsertMetricDays(
+  inputs: MetricDayUpsertInput[],
+): Promise<void> {
+  if (inputs.length === 0) {
+    return;
+  }
+  await prisma.$transaction(
+    inputs.map((input) =>
+      prisma.workspaceMetricDay.upsert({
+        where: {
+          workspaceId_calendarDay: {
+            workspaceId: input.workspaceId,
+            calendarDay: input.calendarDay,
+          },
+        },
+        create: {
+          workspaceId: input.workspaceId,
+          calendarDay: input.calendarDay,
+          collectedAt: input.collectedAt,
+          vtexRevenue:
+            input.vtexRevenue !== null
+              ? new Prisma.Decimal(input.vtexRevenue)
+              : null,
+          vtexOrders: input.vtexOrders,
+          ga4Sessions: input.ga4Sessions,
+          ga4Purchases: input.ga4Purchases,
+          gscClicks: input.gscClicks,
+        },
+        update: {
+          collectedAt: input.collectedAt,
+          vtexRevenue:
+            input.vtexRevenue !== null
+              ? new Prisma.Decimal(input.vtexRevenue)
+              : null,
+          vtexOrders: input.vtexOrders,
+          ga4Sessions: input.ga4Sessions,
+          ga4Purchases: input.ga4Purchases,
+          gscClicks: input.gscClicks,
+        },
+      }),
+    ),
+  );
 }

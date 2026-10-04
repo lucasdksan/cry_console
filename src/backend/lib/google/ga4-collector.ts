@@ -17,7 +17,7 @@ function metricAt(row: Ga4Row, index: number): number {
   return Number(row.metricValues?.[index]?.value ?? 0);
 }
 
-async function runGa4Report(
+export async function runGa4Report(
   accessToken: string,
   propertyId: string,
   body: Record<string, unknown>,
