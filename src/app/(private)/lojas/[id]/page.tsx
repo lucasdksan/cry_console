@@ -2,10 +2,10 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/backend/auth";
-import { activateWorkspace } from "@/backend/controllers/workspace.controller";
 import {
   findWorkspaceForUser,
   getUserActiveWorkspaceId,
+  setActiveWorkspaceForUser,
 } from "@/backend/models/workspace.model";
 import { isSentryServerConfigured } from "@/backend/lib/sentry";
 import { findObservabilityForUserWorkspace } from "@/backend/models/observability.model";
@@ -33,7 +33,7 @@ export default async function LojaDetalhePage({ params }: LojaDetalhePageProps) 
 
   const activeId = await getUserActiveWorkspaceId(session.user.id);
   if (activeId !== workspace.id) {
-    await activateWorkspace(workspace.id);
+    await setActiveWorkspaceForUser(session.user.id, workspace.id);
   }
 
   const observability = await findObservabilityForUserWorkspace(
