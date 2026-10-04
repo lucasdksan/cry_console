@@ -64,6 +64,7 @@ model Workspace {
   observability  WorkspaceObservability?
   metricTargets  WorkspaceMetricTarget[]
   metricSnapshots WorkspaceMetricSnapshot[]
+  metricDays     WorkspaceMetricDay[]
   claritySnapshots WorkspaceClaritySnapshot[]
 
   @@unique([userId, nameKey])
@@ -130,6 +131,25 @@ model WorkspaceMetricSnapshot {
 
   @@unique([workspaceId, periodType, capturedOn])
   @@index([workspaceId, periodType])
+}
+
+model WorkspaceMetricDay {
+  id              String   @id @default(cuid())
+  workspaceId     String
+  calendarDay     DateTime @db.Date
+  vtexRevenue     Decimal? @db.Decimal(18, 4)
+  vtexOrders      Int?
+  ga4Sessions     Int?
+  ga4Purchases    Int?
+  gscClicks       Int?
+  collectedAt     DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, calendarDay])
+  @@index([workspaceId, calendarDay])
 }
 
 model WorkspaceClaritySnapshot {
