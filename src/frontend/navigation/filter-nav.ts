@@ -2,6 +2,7 @@ import type {
   NavFooterItem,
   NavGroupItem,
   NavLeafItem,
+  NavLinkItem,
   NavSectionItem,
 } from "@/frontend/navigation/nav";
 
@@ -9,20 +10,67 @@ function normalizeQuery(query: string): string {
   return query.trim().toLowerCase();
 }
 
+function linkMatchesQuery(link: NavLinkItem, normalizedQuery: string): boolean {
+  if (link.label.toLowerCase().includes(normalizedQuery)) {
+    return true;
+  }
+  return (
+    link.children?.some((child) =>
+      child.label.toLowerCase().includes(normalizedQuery),
+    ) ?? false
+  );
+}
+
+function filterLinkItem(
+  link: NavLinkItem,
+  normalizedQuery: string,
+): NavLinkItem | null {
+  const parentMatches = link.label.toLowerCase().includes(normalizedQuery);
+  if (parentMatches) {
+    return link;
+  }
+  const children = link.children?.filter((child) =>
+    child.label.toLowerCase().includes(normalizedQuery),
+  );
+  if (children && children.length > 0) {
+    return { ...link, children };
+  }
+  return null;
+}
+
 function leafMatchesQuery(item: NavLeafItem, normalizedQuery: string): boolean {
   if (item.type === "slot") {
     return true;
   }
+  if (item.type === "link") {
+    return linkMatchesQuery(item, normalizedQuery);
+  }
   return item.label.toLowerCase().includes(normalizedQuery);
+}
+
+function filterLeafItem(
+  item: NavLeafItem,
+  normalizedQuery: string,
+): NavLeafItem | null {
+  if (item.type === "slot") {
+    return item;
+  }
+  if (item.type === "link") {
+    return filterLinkItem(item, normalizedQuery);
+  }
+  if (leafMatchesQuery(item, normalizedQuery)) {
+    return item;
+  }
+  return null;
 }
 
 function filterGroup(
   group: NavGroupItem,
   normalizedQuery: string,
 ): NavGroupItem | null {
-  const items = group.items.filter((item) =>
-    leafMatchesQuery(item, normalizedQuery),
-  );
+  const items = group.items
+    .map((item) => filterLeafItem(item, normalizedQuery))
+    .filter((item): item is NavLeafItem => item !== null);
   if (items.length === 0) {
     return null;
   }

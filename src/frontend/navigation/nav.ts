@@ -6,6 +6,9 @@ export type NavLinkItem = {
   label: string;
   href: string;
   icon?: LucideIcon;
+  children?: NavLinkItem[];
+  /** Só expande/recolhe filhos; navegação fica nas ações filhas. */
+  toggleOnly?: boolean;
 };
 
 export type NavExternalItem = {

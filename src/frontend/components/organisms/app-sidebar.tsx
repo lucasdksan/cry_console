@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Fragment, useMemo, useState } from "react";
@@ -24,6 +24,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarSeparator,
   sidebarMenuButtonVariants,
   useSidebar,
@@ -37,6 +40,7 @@ import {
 import type {
   NavFooterItem,
   NavLeafItem,
+  NavLinkItem,
   NavSectionItem,
 } from "@/frontend/navigation/nav";
 
@@ -48,8 +52,22 @@ type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   workspaceLimitReached?: boolean;
 };
 
+/** Coluna fixa à direita — alinha + do grupo com chevrons dos workspaces. */
+const sidebarNavTrailingSlotClass =
+  "flex size-7 shrink-0 items-center justify-center text-muted-foreground";
+
 function isNavItemActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function isWorkspaceRouteActive(pathname: string, item: NavLinkItem): boolean {
+  if (!item.children?.length) {
+    return isNavItemActive(pathname, item.href);
+  }
+  if (pathname === item.href || pathname.startsWith(`${item.href}/`)) {
+    return true;
+  }
+  return item.children.some((child) => isNavItemActive(pathname, child.href));
 }
 
 export function AppSidebar({
@@ -63,6 +81,9 @@ export function AppSidebar({
   const pathname = usePathname();
   const { isMobile, setOpenMobile } = useSidebar();
   const [query, setQuery] = useState("");
+  const [expandedWorkspaceIds, setExpandedWorkspaceIds] = useState<
+    Record<string, boolean>
+  >({});
 
   const filteredSections = useMemo(
     () => filterNavSections(sections, query),
@@ -118,20 +139,105 @@ export function AppSidebar({
       );
     }
 
+    return renderNavLink(item);
+  }
+
+  function workspaceExpanded(link: NavLinkItem): boolean {
+    if (!link.children?.length) {
+      return false;
+    }
+    if (expandedWorkspaceIds[link.id] !== undefined) {
+      return expandedWorkspaceIds[link.id];
+    }
+    return isWorkspaceRouteActive(pathname, link);
+  }
+
+  function toggleWorkspace(link: NavLinkItem) {
+    const next = !workspaceExpanded(link);
+    setExpandedWorkspaceIds((prev) => ({ ...prev, [link.id]: next }));
+  }
+
+  function renderNavLink(item: NavLinkItem) {
     const Icon = item.icon;
-    const active = isNavItemActive(pathname, item.href);
+    const hasChildren = Boolean(item.children?.length);
+    const toggleOnly = item.toggleOnly && hasChildren;
+    const active = toggleOnly
+      ? false
+      : pathname === item.href ||
+        (hasChildren ? false : isNavItemActive(pathname, item.href));
+    const showChildren = hasChildren && workspaceExpanded(item);
 
     return (
-      <SidebarMenuItem>
-        <Link
-          href={item.href}
-          onClick={closeMobileNav}
-          data-active={active ? "" : undefined}
-          className={cn(sidebarMenuButtonVariants())}
-        >
-          {Icon ? <Icon /> : null}
-          <span>{item.label}</span>
-        </Link>
+      <SidebarMenuItem
+        className={cn(hasChildren && "flex flex-col gap-1.5")}
+      >
+        {toggleOnly ? (
+          <SidebarMenuButton
+            type="button"
+            onClick={(event) => {
+              toggleWorkspace(item);
+              event.currentTarget.blur();
+            }}
+            aria-expanded={showChildren}
+            className={cn(
+              "!grid w-full grid-cols-[auto_minmax(0,1fr)_1.75rem] items-center gap-2 transition-none",
+              "focus-visible:ring-1 focus-visible:ring-sidebar-border/80",
+              "data-active:bg-transparent data-active:font-normal data-active:shadow-none",
+              showChildren &&
+                "bg-sidebar-accent/50 font-medium text-sidebar-accent-foreground",
+            )}
+          >
+            {Icon ? <Icon /> : null}
+            <span className="truncate text-left">{item.label}</span>
+            <span className={sidebarNavTrailingSlotClass} aria-hidden>
+              {showChildren ? (
+                <ChevronDown className="size-4" />
+              ) : (
+                <ChevronRight className="size-4" />
+              )}
+            </span>
+          </SidebarMenuButton>
+        ) : (
+          <Link
+            href={item.href}
+            onClick={closeMobileNav}
+            data-active={active ? "" : undefined}
+            className={cn(sidebarMenuButtonVariants())}
+          >
+            {Icon ? <Icon /> : null}
+            <span>{item.label}</span>
+          </Link>
+        )}
+        {hasChildren ? (
+          <SidebarMenuSub
+            className={cn(
+              "mx-3 gap-1.5 border-sidebar-border/60 py-0",
+              !showChildren && "hidden",
+            )}
+            aria-hidden={!showChildren}
+          >
+            {item.children!.map((child) => {
+              const childActive =
+                pathname === child.href ||
+                (child.href !== item.href &&
+                  isNavItemActive(pathname, child.href));
+              const ChildIcon = child.icon;
+              return (
+                <SidebarMenuSubItem key={child.id}>
+                  <SidebarMenuSubButton
+                    isActive={childActive}
+                    render={
+                      <Link href={child.href} onClick={closeMobileNav} />
+                    }
+                  >
+                    {ChildIcon ? <ChildIcon /> : null}
+                    <span>{child.label}</span>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+              );
+            })}
+          </SidebarMenuSub>
+        ) : null}
       </SidebarMenuItem>
     );
   }
@@ -165,21 +271,37 @@ export function AppSidebar({
             if (section.type === "group") {
               return (
                 <SidebarGroup key={section.id} className="py-0">
-                  <SidebarGroupLabel className="flex items-center justify-between uppercase tracking-wide">
-                    <span>{section.label}</span>
+                  <SidebarGroupLabel
+                    className={cn(
+                      "w-full uppercase tracking-wide",
+                      section.headerAction
+                        ? "grid grid-cols-[minmax(0,1fr)_1.75rem] items-center gap-0"
+                        : undefined,
+                    )}
+                  >
+                    <span className="truncate">{section.label}</span>
                     {section.headerAction && !workspaceLimitReached ? (
                       <Link
                         href={section.headerAction.href}
                         onClick={closeMobileNav}
-                        className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        className={cn(
+                          sidebarNavTrailingSlotClass,
+                          "rounded-md transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                        )}
                         aria-label={section.headerAction.ariaLabel}
                       >
-                        <Plus />
+                        <Plus className="size-4" />
                       </Link>
+                    ) : section.headerAction && workspaceLimitReached ? (
+                      <span className={sidebarNavTrailingSlotClass} aria-hidden />
                     ) : null}
                   </SidebarGroupLabel>
                   <SidebarGroupContent>
-                    <SidebarMenu>
+                    <SidebarMenu
+                      className={
+                        section.id === "workspaces" ? "gap-2" : undefined
+                      }
+                    >
                       {section.items.map((item) => (
                         <Fragment key={item.id}>{renderLeaf(item)}</Fragment>
                       ))}

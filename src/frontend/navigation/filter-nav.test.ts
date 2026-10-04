@@ -28,6 +28,48 @@ describe("filterNavSections", () => {
   it("remove grupo sem filhos após filtrar", () => {
     expect(filterNavSections(defaultNavSections, "inexistente")).toEqual([]);
   });
+
+  it("filtra workspace pelo rótulo da ação filha", () => {
+    const sections = filterNavSections(
+      [
+        {
+          type: "group",
+          id: "workspaces",
+          label: "Workspaces",
+          items: [
+            {
+              type: "link",
+              id: "workspace-w1",
+              label: "Minha Loja",
+              href: "/lojas/w1",
+              children: [
+                {
+                  type: "link",
+                  id: "workspace-w1-avisos",
+                  label: "Avisos",
+                  href: "/lojas/w1/avisos",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      "avisos",
+    );
+    expect(sections).toHaveLength(1);
+    const group = sections[0];
+    expect(group).toMatchObject({ type: "group" });
+    if (group.type === "group") {
+      expect(group.items).toHaveLength(1);
+      const link = group.items[0];
+      expect(link).toMatchObject({ type: "link", label: "Minha Loja" });
+      if (link.type === "link") {
+        expect(link.children).toEqual([
+          expect.objectContaining({ label: "Avisos" }),
+        ]);
+      }
+    }
+  });
 });
 
 describe("filterNavFooter", () => {
