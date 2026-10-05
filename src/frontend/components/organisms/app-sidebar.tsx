@@ -54,6 +54,7 @@ import type {
   NavLinkItem,
   NavSectionItem,
 } from "@/frontend/navigation/nav";
+import { useAgentNavRefresh } from "@/frontend/lib/agent/nav-sync";
 
 type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   sections: NavSectionItem[];
@@ -91,6 +92,7 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const refreshAgentNav = useAgentNavRefresh();
   const { isMobile, setOpenMobile } = useSidebar();
   const [query, setQuery] = useState("");
   const [agentSessionPendingDelete, setAgentSessionPendingDelete] = useState<
@@ -183,6 +185,7 @@ export function AppSidebar({
       if (pathname === `/agente/${sessionId}`) {
         router.push("/agente");
       }
+      await refreshAgentNav();
       router.refresh();
       closeMobileNav();
     }
@@ -191,12 +194,14 @@ export function AppSidebar({
   function renderNavLink(item: NavLinkItem) {
     const Icon = item.icon;
     const hasChildren = Boolean(item.children?.length);
+    const isAgentNav = item.id === "agent";
     const toggleOnly = item.toggleOnly && hasChildren;
     const active = toggleOnly
       ? false
       : pathname === item.href ||
         (hasChildren ? false : isNavItemActive(pathname, item.href));
     const showChildren = hasChildren && workspaceExpanded(item);
+    const showWorkspaceToggleChrome = toggleOnly && !isAgentNav;
 
     return (
       <SidebarMenuItem
@@ -212,9 +217,11 @@ export function AppSidebar({
             aria-expanded={showChildren}
             className={cn(
               "!grid w-full items-center gap-2 transition-none",
-              item.trailingAction
-                ? "grid-cols-[auto_minmax(0,1fr)_1.75rem_1.75rem]"
-                : "grid-cols-[auto_minmax(0,1fr)_1.75rem]",
+              showWorkspaceToggleChrome
+                ? item.trailingAction
+                  ? "grid-cols-[auto_minmax(0,1fr)_1.75rem_1.75rem]"
+                  : "grid-cols-[auto_minmax(0,1fr)_1.75rem]"
+                : "grid-cols-[auto_minmax(0,1fr)]",
               "focus-visible:ring-1 focus-visible:ring-sidebar-border/80",
               "data-active:bg-transparent data-active:font-normal data-active:shadow-none",
               showChildren &&
@@ -223,7 +230,7 @@ export function AppSidebar({
           >
             {Icon ? <Icon /> : null}
             <span className="truncate text-left">{item.label}</span>
-            {item.trailingAction ? (
+            {showWorkspaceToggleChrome && item.trailingAction ? (
               <Link
                 href={item.trailingAction.href}
                 onClick={(event) => {
@@ -239,13 +246,15 @@ export function AppSidebar({
                 <Plus className="size-4" />
               </Link>
             ) : null}
-            <span className={sidebarNavTrailingSlotClass} aria-hidden>
-              {showChildren ? (
-                <ChevronDown className="size-4" />
-              ) : (
-                <ChevronRight className="size-4" />
-              )}
-            </span>
+            {showWorkspaceToggleChrome ? (
+              <span className={sidebarNavTrailingSlotClass} aria-hidden>
+                {showChildren ? (
+                  <ChevronDown className="size-4" />
+                ) : (
+                  <ChevronRight className="size-4" />
+                )}
+              </span>
+            ) : null}
           </SidebarMenuButton>
         ) : (
           <Link
@@ -272,6 +281,22 @@ export function AppSidebar({
                 (child.href !== item.href &&
                   isNavItemActive(pathname, child.href));
               const ChildIcon = child.icon;
+              if (child.id === "agent-new-session") {
+                return (
+                  <SidebarMenuSubItem key={child.id}>
+                    <SidebarMenuSubButton
+                      isActive={pathname === "/agente"}
+                      className="text-muted-foreground"
+                      render={
+                        <Link href={child.href} onClick={closeMobileNav} />
+                      }
+                    >
+                      {ChildIcon ? <ChildIcon /> : null}
+                      <span>{child.label}</span>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                );
+              }
               const agentSessionId = child.id.startsWith("agent-session-")
                 ? child.id.slice("agent-session-".length)
                 : null;

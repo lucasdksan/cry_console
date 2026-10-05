@@ -39,6 +39,7 @@ import {
   generateChromePromptText,
   checkChromePromptReady,
 } from "@/frontend/lib/browser/prompt";
+import { useAgentNavRefresh } from "@/frontend/lib/agent/nav-sync";
 
 type AgentChatBoardProps = {
   session: AgentSessionPublic | null;
@@ -52,6 +53,7 @@ export function AgentChatBoard({
   workspaces,
 }: AgentChatBoardProps) {
   const router = useRouter();
+  const refreshAgentNav = useAgentNavRefresh();
   const [messages, setMessages] = React.useState(initialMessages);
   const [mode, setMode] = React.useState<AgentChatMode>(
     session?.mode ?? "agent",
@@ -64,27 +66,13 @@ export function AgentChatBoard({
   );
   const [modelOptionId, setModelOptionId] = React.useState("");
   const [busy, setBusy] = React.useState(false);
-  const [thinkingStarted, setThinkingStarted] = React.useState<number | null>(
-    null,
-  );
-  const [, setThinkingTick] = React.useState(0);
+  const [thinkingTick, setThinkingTick] = React.useState(0);
   const [approvingPlanId, setApprovingPlanId] = React.useState<string | null>(
     null,
   );
 
   const isEmpty = messages.length === 0;
   const showLanding = isEmpty && !session;
-
-  React.useEffect(() => {
-    setMessages(initialMessages);
-  }, [initialMessages]);
-
-  React.useEffect(() => {
-    if (session) {
-      setMode(session.mode);
-      setWorkspaceId(session.workspaceId);
-    }
-  }, [session]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -116,10 +104,7 @@ export function AgentChatBoard({
     return () => window.clearInterval(timer);
   }, [busy]);
 
-  const displayThinking =
-    busy && thinkingStarted !== null
-      ? Math.floor((Date.now() - thinkingStarted) / 1000)
-      : undefined;
+  const displayThinking = busy ? thinkingTick : undefined;
 
   const composerProps = {
     mode,
@@ -162,7 +147,7 @@ export function AgentChatBoard({
       setMode(parsed.mode);
       if (session) {
         setBusy(true);
-        setThinkingStarted(Date.now());
+        setThinkingTick(0);
         const result = await sendAgentMessage({
           sessionId: session.id,
           mode: parsed.mode,
@@ -171,9 +156,9 @@ export function AgentChatBoard({
           chromeReady: await checkChromePromptReady(),
         });
         setBusy(false);
-        setThinkingStarted(null);
         if (result.ok && "messages" in result) {
           setMessages(result.messages);
+          await refreshAgentNav();
         }
       }
       return;
@@ -187,7 +172,7 @@ export function AgentChatBoard({
     }
 
     setBusy(true);
-    setThinkingStarted(Date.now());
+    setThinkingTick(0);
     try {
       const chromeReady = await checkChromePromptReady();
       const result = await sendAgentMessage({
@@ -204,6 +189,7 @@ export function AgentChatBoard({
       }
 
       if (!session && result.sessionId) {
+        await refreshAgentNav();
         router.push(`/agente/${result.sessionId}`);
         router.refresh();
         return;
@@ -220,6 +206,7 @@ export function AgentChatBoard({
         setMessages(result.messages);
       }
 
+      await refreshAgentNav();
       router.refresh();
     } catch (error) {
       const message =
@@ -239,7 +226,6 @@ export function AgentChatBoard({
       ]);
     } finally {
       setBusy(false);
-      setThinkingStarted(null);
     }
   }
 
@@ -249,7 +235,7 @@ export function AgentChatBoard({
     }
     setApprovingPlanId(messageId);
     setBusy(true);
-    setThinkingStarted(Date.now());
+    setThinkingTick(0);
     try {
       const chromeReady = await checkChromePromptReady();
       const result = await approveAgentPlan({
@@ -271,6 +257,7 @@ export function AgentChatBoard({
       } else if ("messages" in result && result.messages) {
         setMessages(result.messages);
       }
+      await refreshAgentNav();
       router.refresh();
     } catch (error) {
       const message =
@@ -291,7 +278,6 @@ export function AgentChatBoard({
     } finally {
       setApprovingPlanId(null);
       setBusy(false);
-      setThinkingStarted(null);
     }
   }
 
@@ -301,6 +287,7 @@ export function AgentChatBoard({
     }
     const result = await deleteAgentSessionAction(session.id);
     if (result.ok) {
+      await refreshAgentNav();
       router.push("/agente");
       router.refresh();
     }
@@ -384,6 +371,7 @@ function EditableSessionTitle({
   workspaceName: string | null;
 }) {
   const router = useRouter();
+  const refreshAgentNav = useAgentNavRefresh();
   const [title, setTitle] = React.useState(initialTitle);
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState(initialTitle);
@@ -417,6 +405,7 @@ function EditableSessionTitle({
     }
     setTitle(result.title);
     setEditing(false);
+    await refreshAgentNav();
     router.refresh();
   }
 

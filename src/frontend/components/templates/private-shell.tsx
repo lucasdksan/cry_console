@@ -12,6 +12,7 @@ import {
   type WorkspaceNavSummary,
 } from "@/frontend/navigation/workspace-nav";
 import { AppSidebar } from "@/frontend/components/organisms/app-sidebar";
+import { AgentNavSyncProvider } from "@/frontend/lib/agent/nav-sync";
 import { BrandLogo } from "@/frontend/components/atoms/brand-logo";
 import {
   SidebarInset,
@@ -42,6 +43,7 @@ export function PrivateShell({
     [workspaces, agentSessions],
   );
   return (
+    <AgentNavSyncProvider>
     <SidebarProvider
       defaultOpen
       style={
@@ -68,5 +70,6 @@ export function PrivateShell({
         </div>
       </SidebarInset>
     </SidebarProvider>
+    </AgentNavSyncProvider>
   );
 }

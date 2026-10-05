@@ -14,6 +14,7 @@ export function AgentTemplate({
 }: AgentTemplateProps) {
   return (
     <AgentChatBoard
+      key={session?.id ?? "new"}
       session={session}
       initialMessages={messages}
       workspaces={workspaces}

@@ -81,10 +81,6 @@ export const defaultNavSections: NavSectionItem[] = [
         href: "/agente",
         icon: Bot,
         toggleOnly: true,
-        trailingAction: {
-          href: "/agente",
-          ariaLabel: "Nova sessão",
-        },
         children: [],
       },
     ],

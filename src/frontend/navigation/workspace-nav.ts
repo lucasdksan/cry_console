@@ -1,4 +1,4 @@
-import { Store } from "lucide-react";
+import { Plus, Store } from "lucide-react";
 
 import {
   defaultNavSections,
@@ -68,6 +68,15 @@ export function buildPrivateNavSections(
             : session.title,
           href: `/agente/${session.id}`,
         }));
+        if (children.length > 0) {
+          children.push({
+            type: "link",
+            id: "agent-new-session",
+            label: "Nova conversa",
+            href: "/agente",
+            icon: Plus,
+          });
+        }
         return { ...item, children };
       }),
     };
