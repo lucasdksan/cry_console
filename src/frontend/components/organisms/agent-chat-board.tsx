@@ -70,6 +70,8 @@ export function AgentChatBoard({
   const [approvingPlanId, setApprovingPlanId] = React.useState<string | null>(
     null,
   );
+  const sessionTitleRef = React.useRef<EditableSessionTitleHandle>(null);
+  const [sessionTitleEditing, setSessionTitleEditing] = React.useState(false);
 
   const isEmpty = messages.length === 0;
   const showLanding = isEmpty && !session;
@@ -298,12 +300,26 @@ export function AgentChatBoard({
       {session && !showLanding ? (
         <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
           <EditableSessionTitle
+            ref={sessionTitleRef}
             key={session.id}
             sessionId={session.id}
             initialTitle={session.title}
             workspaceName={session.workspaceName}
+            onEditingChange={setSessionTitleEditing}
           />
-          <AlertDialog>
+          <div className="flex shrink-0 items-center gap-2">
+            {!sessionTitleEditing ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => sessionTitleRef.current?.startEditing()}
+              >
+                <Pencil className="size-4" />
+                Editar
+              </Button>
+            ) : null}
+            <AlertDialog>
             <AlertDialogTrigger render={<Button variant="outline" size="sm" />}>
               <Trash2 className="size-4" />
               Excluir
@@ -323,6 +339,7 @@ export function AgentChatBoard({
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+          </div>
         </header>
       ) : null}
 
@@ -361,15 +378,22 @@ export function AgentChatBoard({
   );
 }
 
-function EditableSessionTitle({
-  sessionId,
-  initialTitle,
-  workspaceName,
-}: {
-  sessionId: string;
-  initialTitle: string;
-  workspaceName: string | null;
-}) {
+type EditableSessionTitleHandle = {
+  startEditing: () => void;
+};
+
+const EditableSessionTitle = React.forwardRef<
+  EditableSessionTitleHandle,
+  {
+    sessionId: string;
+    initialTitle: string;
+    workspaceName: string | null;
+    onEditingChange?: (editing: boolean) => void;
+  }
+>(function EditableSessionTitle(
+  { sessionId, initialTitle, workspaceName, onEditingChange },
+  ref,
+) {
   const router = useRouter();
   const refreshAgentNav = useAgentNavRefresh();
   const [title, setTitle] = React.useState(initialTitle);
@@ -377,6 +401,22 @@ function EditableSessionTitle({
   const [draft, setDraft] = React.useState(initialTitle);
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+
+  React.useImperativeHandle(
+    ref,
+    () => ({
+      startEditing: () => {
+        setDraft(title);
+        setError(null);
+        setEditing(true);
+      },
+    }),
+    [title],
+  );
+
+  React.useEffect(() => {
+    onEditingChange?.(editing);
+  }, [editing, onEditingChange]);
 
   async function handleSave() {
     if (saving) {
@@ -462,25 +502,9 @@ function EditableSessionTitle({
           </Button>
         </form>
       ) : (
-        <div className="group flex min-w-0 items-center gap-1.5">
-          <h1 className="truncate text-lg font-semibold tracking-tight">
-            {title}
-          </h1>
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            aria-label="Renomear conversa"
-            className="size-7 shrink-0 opacity-60 transition-opacity hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100"
-            onClick={() => {
-              setDraft(title);
-              setError(null);
-              setEditing(true);
-            }}
-          >
-            <Pencil className="size-3.5" />
-          </Button>
-        </div>
+        <h1 className="truncate text-lg font-semibold tracking-tight">
+          {title}
+        </h1>
       )}
       {error ? (
         <p className="mt-1 text-xs text-destructive">{error}</p>
@@ -491,4 +515,4 @@ function EditableSessionTitle({
       )}
     </div>
   );
-}
+});
