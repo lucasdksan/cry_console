@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { collectGa4Analytics } from "@/backend/lib/google/ga4-collector";
+import type { FetchFn } from "@/backend/lib/google/google-auth";
 
 describe("collectGa4Analytics", () => {
   it("monta bundle normalizado a partir de runReport", async () => {
@@ -63,7 +64,7 @@ describe("collectGa4Analytics", () => {
   });
 
   it("não envia endDate futuro no runReport", async () => {
-    const fetchFn = vi.fn(async () => Response.json({ rows: [] }));
+    const fetchFn = vi.fn<FetchFn>(async () => Response.json({ rows: [] }));
     const today = new Intl.DateTimeFormat("en-CA", {
       timeZone: "America/Sao_Paulo",
       year: "numeric",
