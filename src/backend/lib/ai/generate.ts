@@ -35,21 +35,53 @@ async function readResponseError(response: Response): Promise<string> {
   }
 }
 
+function geminiEmptyResponseMessage(response: {
+  promptFeedback?: { blockReason?: string };
+  candidates?: { finishReason?: string }[];
+}): string {
+  const blockReason = response.promptFeedback?.blockReason;
+  if (blockReason) {
+    return `O Gemini bloqueou o prompt (${blockReason}).`;
+  }
+  const finishReason = response.candidates?.[0]?.finishReason;
+  if (finishReason) {
+    return `O Gemini não gerou texto (motivo: ${finishReason}).`;
+  }
+  return "O modelo não retornou texto.";
+}
+
+function toAiGenerateError(error: unknown, fallback: string): AiGenerateError {
+  if (error instanceof AiGenerateError) {
+    return error;
+  }
+  if (error instanceof Error && error.message.trim()) {
+    return new AiGenerateError(error.message.trim());
+  }
+  if (typeof error === "string" && error.trim()) {
+    return new AiGenerateError(error.trim());
+  }
+  return new AiGenerateError(fallback);
+}
+
 async function generateWithGeminiApi(
   apiKey: string,
   model: string,
   prompt: string,
 ): Promise<string> {
-  const ai = new GoogleGenAI({ apiKey });
-  const response = await ai.models.generateContent({
-    model,
-    contents: prompt,
-  });
-  const text = response.text?.trim();
-  if (!text) {
-    throw new AiGenerateError("O modelo não retornou texto.");
+  try {
+    const ai = new GoogleGenAI({ apiKey });
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+    });
+    const text = response.text?.trim();
+    if (!text) {
+      throw new AiGenerateError(geminiEmptyResponseMessage(response));
+    }
+    return text;
+  } catch (error) {
+    throw toAiGenerateError(error, "Erro ao chamar a API Gemini.");
   }
-  return text;
 }
 
 async function generateWithOpenAiCompat(input: {
