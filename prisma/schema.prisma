@@ -69,6 +69,7 @@ model Workspace {
   metricDays     WorkspaceMetricDay[]
   claritySnapshots WorkspaceClaritySnapshot[]
   analysis         WorkspaceAnalysis?
+  pageAudit        WorkspacePageAudit?
   agentSessions    AgentSession[]
 
   @@unique([userId, nameKey])
@@ -84,6 +85,7 @@ enum WorkspaceAnalysisStatus {
 enum AiUsagePurpose {
   analysis
   agent
+  page_audit
 }
 
 enum AgentChatMode {
@@ -156,6 +158,25 @@ model WorkspaceAnalysis {
   collectedAt     DateTime
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model WorkspacePageAudit {
+  id            String                  @id @default(cuid())
+  workspaceId   String                  @unique
+  url           String
+  reportJson    Json
+  narrativeJson Json?
+  status        WorkspaceAnalysisStatus
+  aiProviderKey String?
+  aiModel       String?
+  aiRoute       String?
+  collectedAt   DateTime
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
