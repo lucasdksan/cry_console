@@ -56,6 +56,14 @@ describe("parseAgentInput", () => {
     if (alertas.kind === "message") {
       expect(alertas.workspaceCommand).toEqual({ kind: "alerts" });
     }
+
+    const projecao = parseAgentInput("/projecao sessões");
+    if (projecao.kind === "message") {
+      expect(projecao.workspaceCommand).toEqual({
+        kind: "projection",
+        metricHint: "sessões",
+      });
+    }
   });
 
   it("bloqueia comando de loja no Ask", () => {

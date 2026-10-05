@@ -9,10 +9,8 @@ import {
   parseAgentInput,
   type AgentWorkspaceCommand,
 } from "@/backend/lib/agent/command";
-import {
-  buildChartPartForWorkspaceCommand,
-  extractChartMarker,
-} from "@/backend/lib/agent/chart";
+import { buildChartPartForWorkspaceCommand } from "@/backend/lib/agent/chart";
+import { buildAgentMessageParts } from "@/backend/lib/agent/parts";
 import {
   loadAgentWorkspaceContext,
 } from "@/backend/lib/agent/context";
@@ -172,7 +170,7 @@ export async function getAgentSessionDetail(sessionId: string): Promise<
       session: AgentSessionPublic;
       messages: AgentMessagePublic[];
     }
-  | { ok: false; error: string }
+  | { ok: false; error: string; retryable?: boolean }
 > {
   const userId = await requireUserId();
   const session = await findAgentSessionForUser(userId, sessionId);
@@ -260,7 +258,7 @@ async function generateWithModelChoice(
       providerKey: string | null;
       modelLabel: string | null;
     }
-  | { ok: false; error: string }
+  | { ok: false; error: string; retryable?: boolean }
 > {
   try {
     if (model.source === "browser") {
@@ -320,7 +318,11 @@ async function generateWithModelChoice(
     };
   } catch (error) {
     if (error instanceof AiGenerateError) {
-      return { ok: false, error: error.message };
+      return {
+        ok: false,
+        error: error.message,
+        retryable: error.retryable,
+      };
     }
     if (error instanceof CredentialsCryptoError) {
       return {
@@ -330,10 +332,20 @@ async function generateWithModelChoice(
       };
     }
     if (error instanceof Error && error.message.trim()) {
-      return { ok: false, error: error.message.trim() };
+      const aiErr = AiGenerateError.fromRaw(error.message.trim());
+      return {
+        ok: false,
+        error: aiErr.message,
+        retryable: aiErr.retryable,
+      };
     }
     if (typeof error === "string" && error.trim()) {
-      return { ok: false, error: error.trim() };
+      const aiErr = AiGenerateError.fromRaw(error.trim());
+      return {
+        ok: false,
+        error: aiErr.message,
+        retryable: aiErr.retryable,
+      };
     }
     return { ok: false, error: "Falha ao gerar resposta." };
   }
@@ -416,7 +428,7 @@ export type SendAgentMessageResult =
       prompt: string;
       userMessageId: string;
     }
-  | { ok: false; error: string };
+  | { ok: false; error: string; retryable?: boolean };
 
 export async function sendAgentMessage(input: {
   sessionId?: string | null;
@@ -613,7 +625,11 @@ export async function sendAgentMessage(input: {
         };
       }
     }
-    return { ok: false, error: generated.error };
+    return {
+      ok: false,
+      error: generated.error,
+      retryable: generated.retryable,
+    };
   }
 
   const parts = await buildAssistantParts({
@@ -665,39 +681,34 @@ async function buildAssistantParts(input: {
   text: string;
   workspaceContext: Awaited<ReturnType<typeof loadAgentWorkspaceContext>>;
   workspaceCommand?: AgentWorkspaceCommand;
+  replayArtifacts?: import("@/backend/lib/agent/types").AgentPlanArtifacts;
 }) {
-  const { cleanedText, metricKey: markerMetric } = extractChartMarker(input.text);
-  let content = cleanedText || input.text.trim();
-  const parts: import("@/backend/lib/agent/types").AgentMessageParts["parts"] = [];
+  const built = buildAgentMessageParts({
+    mode: input.mode,
+    text: input.text,
+    workspaceContext: input.workspaceContext,
+    workspaceCommand: input.workspaceCommand,
+    replayArtifacts: input.replayArtifacts,
+  });
 
   if (input.mode === "plan") {
+    let content = built.content;
     if (!isValidPlanMarkdown(content)) {
       content = `# Plano proposto\n\n${content}`;
     }
-    parts.push({ type: "plan_pending", markdown: content });
+    const parts: import("@/backend/lib/agent/types").AgentMessageParts["parts"] =
+      [
+        {
+          type: "plan_pending",
+          markdown: content,
+          artifacts: built.artifacts,
+        },
+        ...built.parts,
+      ];
     return { content, parts };
   }
 
-  if (input.workspaceContext) {
-    const chart = buildChartPartForWorkspaceCommand({
-      workspaceCommand: input.workspaceCommand,
-      markerMetric,
-      period: input.workspaceContext.period,
-      metricDays: input.workspaceContext.metricDays,
-      sourceStatuses: input.workspaceContext.sourceStatuses,
-      snapshotMetricValues: input.workspaceContext.snapshotMetricValues,
-    });
-    if (chart) {
-      parts.push(chart);
-    } else if (
-      input.workspaceCommand?.kind === "chart" ||
-      input.workspaceCommand?.kind === "search"
-    ) {
-      content += "\n\n_(Série indisponível no período salvo.)_";
-    }
-  }
-
-  return { content, parts };
+  return { content: built.content, parts: built.parts };
 }
 
 export async function completeBrowserAgentTurn(input: {
@@ -707,7 +718,7 @@ export async function completeBrowserAgentTurn(input: {
   mode: AgentChatMode;
 }): Promise<
   | { ok: true; messages: AgentMessagePublic[] }
-  | { ok: false; error: string }
+  | { ok: false; error: string; retryable?: boolean }
 > {
   const userId = await requireUserId();
   const session = await findAgentSessionForUser(userId, input.sessionId);
@@ -722,6 +733,17 @@ export async function completeBrowserAgentTurn(input: {
     : null;
   const workspaceCommand =
     parsedUser?.kind === "message" ? parsedUser.workspaceCommand : undefined;
+
+  let replayArtifacts:
+    | import("@/backend/lib/agent/types").AgentPlanArtifacts
+    | undefined;
+  if (userMessage) {
+    const refParts = parseMessageParts(userMessage.partsJson);
+    const pending = refParts.find((p) => p.type === "plan_pending");
+    if (pending?.type === "plan_pending") {
+      replayArtifacts = pending.artifacts;
+    }
+  }
 
   let workspaceContext = null;
   if (input.mode !== "ask" && session.workspaceId) {
@@ -741,6 +763,7 @@ export async function completeBrowserAgentTurn(input: {
     text: input.text,
     workspaceContext,
     workspaceCommand,
+    replayArtifacts,
   });
 
   await appendAgentMessage({
@@ -835,13 +858,18 @@ export async function approveAgentPlan(input: {
 
   const generated = await generateWithModelChoice(userId, prompt, modelChoice);
   if (!generated.ok) {
-    return { ok: false, error: generated.error };
+    return {
+      ok: false,
+      error: generated.error,
+      retryable: generated.retryable,
+    };
   }
 
   const built = await buildAssistantParts({
     mode: "agent",
     text: generated.text,
     workspaceContext,
+    replayArtifacts: pending.artifacts,
   });
 
   await appendAgentMessage({

@@ -18,10 +18,10 @@ export function buildAgentSystemInstruction(mode: AgentChatMode): string {
     case "ask":
       return `${base} Modo Ask: responda apenas com base nos trechos do catálogo fornecidos. Não invente métricas da loja. ${AGENT_RESPONSE_STYLE_HINT}`;
     case "plan":
-      return `${base} Modo Plan: produza um plano em markdown começando com um título #. Não execute ações; o usuário revisará e aceitará o plano. Não invente scores ou valores em R$.`;
+      return `${base} Modo Plan: produza um plano em markdown começando com um título #. Não execute ações; o usuário revisará e aceitará o plano. Não invente scores ou valores em R$. Marcadores visuais (quando pedidos): [[chart:metric_key]], [[projection:metric_key]], [[funnel]], [[action_plan]].`;
     case "agent":
     default:
-      return `${base} Modo Agent: use somente os dados fornecidos. Não invente scores, métricas ou impacto financeiro em R$. Se faltar dado, diga explicitamente. ${AGENT_RESPONSE_STYLE_HINT}`;
+      return `${base} Modo Agent: use somente os dados fornecidos. Não invente scores, métricas ou impacto financeiro em R$. Se faltar dado, diga explicitamente. Marcadores visuais: [[chart:metric_key]], [[projection:metric_key]], [[funnel]], [[action_plan]]. ${AGENT_RESPONSE_STYLE_HINT}`;
   }
 }
 

@@ -5,6 +5,7 @@ import { PILLAR_TITLES } from "@/backend/lib/analysis/types";
 export type AgentWorkspaceCommand =
   | { kind: "health"; pillar?: Pillar }
   | { kind: "chart"; metricHint?: string }
+  | { kind: "projection"; metricHint?: string }
   | { kind: "action_plan" }
   | { kind: "funnel" }
   | { kind: "alerts" }
@@ -49,6 +50,11 @@ export const AGENT_WORKSPACE_SLASH: AgentSlashCatalogEntry[] = [
     hint: "Tendência de receita ou métrica",
     chipLabel: "Gráfico receita",
     primaryChip: true,
+  },
+  {
+    slash: "/projecao",
+    hint: "Série diária com média, desvio e projeção",
+    chipLabel: "Projeção receita",
   },
   {
     slash: "/plano",
@@ -200,6 +206,19 @@ export function parseAgentInput(raw: string): ParsedAgentInput {
         restText ||
         "Mostre a tendência de receita e comente os pontos principais.",
       workspaceCommand: { kind: "chart", metricHint: restText || "receita" },
+    };
+  }
+
+  if (command === "projecao" || command === "projeção") {
+    return {
+      kind: "message",
+      text:
+        restText ||
+        "Mostre a série diária com média, faixa de desvio e projeção até o fim do mês.",
+      workspaceCommand: {
+        kind: "projection",
+        metricHint: restText || "receita",
+      },
     };
   }
 

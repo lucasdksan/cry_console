@@ -437,6 +437,23 @@ function buildExperiencia(input: AnalysisHeuristicsInput): AnalysisPillarCard {
     });
   }
 
+  if (input.gaOk && input.analytics?.totals) {
+    hasSignal = true;
+    const t = input.analytics.totals;
+    if (t.itemViewEvents != null) {
+      metrics.ga4_funnel_views = t.itemViewEvents;
+    }
+    if (t.addToCarts != null) {
+      metrics.ga4_funnel_cart = t.addToCarts;
+    }
+    if (t.checkouts != null) {
+      metrics.ga4_funnel_checkout = t.checkouts;
+    }
+    if (t.ecommercePurchases != null) {
+      metrics.ga4_funnel_purchase = t.ecommercePurchases;
+    }
+  }
+
   if (input.gaOk && input.analytics?.funnel_rates) {
     hasSignal = true;
     const f = input.analytics.funnel_rates;

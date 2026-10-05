@@ -7,6 +7,7 @@ import type {
 import { PILLAR_TITLES, type Pillar } from "@/backend/lib/analysis/types";
 import type { AgentWorkspaceCommand } from "@/backend/lib/agent/command";
 import { resolveMetricFromHint } from "@/backend/lib/agent/chart";
+import { buildFunnelPartFromMeasurement } from "@/backend/lib/agent/funnel";
 import { findWorkspaceAnalysisByWorkspaceId } from "@/backend/models/workspace-analysis.model";
 import { listMetricDaysForRange } from "@/backend/models/workspace-metric.model";
 import {
@@ -40,6 +41,9 @@ function resolveMetricKeyForCommand(
   command?: AgentWorkspaceCommand,
 ): WorkspaceMetricKey {
   if (command?.kind === "chart") {
+    return resolveMetricFromHint(command.metricHint);
+  }
+  if (command?.kind === "projection") {
     return resolveMetricFromHint(command.metricHint);
   }
   if (command?.kind === "search") {
@@ -207,8 +211,21 @@ export function buildWorkspacePromptSection(
 
   if (command?.kind === "funnel") {
     lines.push(
-      "Explique o funil com base em aquisição (sessões GA4), comercial (pedidos/receita) e experiência (alertas de UX) usando apenas os pilares abaixo.",
+      "Explique o funil GA4 (visualizações → carrinho → checkout → compras) com os volumes salvos na análise. Inclua [[funnel]] para o servidor anexar o diagrama.",
     );
+    const funnel = ctx.measurement
+      ? buildFunnelPartFromMeasurement(ctx.measurement)
+      : null;
+    if (funnel) {
+      for (const t of funnel.transitions) {
+        lines.push(
+          `- ${t.fromLabel} → ${t.toLabel}: passagem ${t.passRatePct?.toFixed(1) ?? "—"}%, perda ${t.dropCount} eventos`,
+        );
+      }
+      if (funnel.bottleneckLabel) {
+        lines.push(`Gargalo: ${funnel.bottleneckLabel}.`);
+      }
+    }
   }
 
   if (ctx.measurement) {
@@ -243,9 +260,15 @@ export function buildWorkspacePromptSection(
     );
   }
 
+  if (command?.kind === "projection") {
+    lines.push(
+      `Inclua [[projection:${ctx.metricKeyForChart}]] para anexar série diária com média, faixa ±1 desvio e projeção até o fim do mês.`,
+    );
+  }
+
   if (command?.kind === "action_plan") {
     lines.push(
-      "Formate recomendações como Problema / Ação / Resultado esperado (sem inventar valores em R$).",
+      "Inclua [[action_plan]] para anexar os cards do plano salvo na análise (sem inventar valores em R$).",
     );
   }
 

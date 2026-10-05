@@ -1,9 +1,14 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import type { AgentMessagePublic } from "@/backend/lib/agent/types";
+import { AgentActionPlanBlock } from "@/frontend/components/molecules/agent-action-plan-block";
 import { AgentChartBlock } from "@/frontend/components/molecules/agent-chart-block";
+import { AgentFunnelBlock } from "@/frontend/components/molecules/agent-funnel-block";
 import { AgentMarkdown } from "@/frontend/components/molecules/agent-markdown";
 import { AgentPlanCard } from "@/frontend/components/molecules/agent-plan-card";
+import { AgentProjectionBlock } from "@/frontend/components/molecules/agent-projection-block";
 import { Badge } from "@/frontend/components/ui/badge";
 import { splitUserMessageAttachments } from "@/frontend/lib/agent/attachments";
 import { cn } from "@/frontend/lib/utils";
@@ -56,15 +61,29 @@ export function AgentMessageBubble({
         )}
       </div>
       {!isUser &&
-        message.parts
-          .filter((p) => p.type === "chart")
-          .map((part, index) =>
-            part.type === "chart" ? (
-              <div key={`chart-${index}`} className="w-full max-w-xl">
-                <AgentChartBlock part={part} />
-              </div>
-            ) : null,
-          )}
+        message.parts.map((part, index) => {
+          if (part.type === "plan_pending") {
+            return null;
+          }
+          const key = `${part.type}-${index}`;
+          const wrap = (node: ReactNode) => (
+            <div key={key} className="w-full max-w-xl">
+              {node}
+            </div>
+          );
+          switch (part.type) {
+            case "chart":
+              return wrap(<AgentChartBlock part={part} />);
+            case "projection":
+              return wrap(<AgentProjectionBlock part={part} />);
+            case "funnel":
+              return wrap(<AgentFunnelBlock part={part} />);
+            case "action_plan":
+              return wrap(<AgentActionPlanBlock part={part} />);
+            default:
+              return null;
+          }
+        })}
       {!isUser && planPart?.type === "plan_pending" && onApprovePlan ? (
         <div className="w-full max-w-xl">
           <AgentPlanCard

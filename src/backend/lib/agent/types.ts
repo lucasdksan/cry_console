@@ -1,6 +1,8 @@
 import type { AgentChatMode, AgentModelSource } from "@/generated/prisma/client";
 import type { WorkspaceMetricKey } from "@/generated/prisma/client";
 
+import type { Pillar } from "@/backend/lib/analysis/types";
+
 export type AgentChartPart = {
   type: "chart";
   metricKey: WorkspaceMetricKey;
@@ -8,24 +10,83 @@ export type AgentChartPart = {
   points: { dateYmd: string; value: number | null }[];
 };
 
+export type AgentProjectionPoint = {
+  dateYmd: string;
+  dailyValue: number | null;
+  meanLine: number | null;
+  bandUpper: number | null;
+  bandLower: number | null;
+  isFuture: boolean;
+};
+
+export type AgentProjectionPart = {
+  type: "projection";
+  metricKey: WorkspaceMetricKey;
+  label: string;
+  mean: number | null;
+  stdDev: number | null;
+  observedTotal: number | null;
+  projectedMonthTotal: number | null;
+  isRateMetric: boolean;
+  outlierDays: { dateYmd: string; value: number }[];
+  points: AgentProjectionPoint[];
+};
+
+export type AgentFunnelStep = {
+  label: string;
+  value: number;
+};
+
+export type AgentFunnelTransition = {
+  fromLabel: string;
+  toLabel: string;
+  passRatePct: number | null;
+  dropCount: number;
+};
+
+export type AgentFunnelPart = {
+  type: "funnel";
+  steps: AgentFunnelStep[];
+  transitions: AgentFunnelTransition[];
+  bottleneckLabel: string | null;
+};
+
+export type AgentPlanArtifacts = {
+  chartMetrics: WorkspaceMetricKey[];
+  projectionMetrics: WorkspaceMetricKey[];
+  funnel: boolean;
+  actionPlan: boolean;
+};
+
 export type AgentPlanPendingPart = {
   type: "plan_pending";
   markdown: string;
+  artifacts?: AgentPlanArtifacts;
+};
+
+export type AgentActionPlanItem = {
+  pillar: Pillar;
+  pillarTitle: string;
+  priority: "alta" | "media" | "baixa";
+  title: string;
+  problem: string;
+  action: string;
+  actionSteps: string[];
+  targetMetric: string;
+  expectedImpact: string;
 };
 
 export type AgentActionPlanPart = {
   type: "action_plan";
-  items: {
-    title: string;
-    problem: string;
-    action: string;
-    expectedImpact: string;
-  }[];
+  items: AgentActionPlanItem[];
+  emptyMessage?: boolean;
 };
 
 export type AgentMessageParts = {
   parts: (
     | AgentChartPart
+    | AgentProjectionPart
+    | AgentFunnelPart
     | AgentPlanPendingPart
     | AgentActionPlanPart
   )[];

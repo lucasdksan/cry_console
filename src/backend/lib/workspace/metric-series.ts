@@ -140,3 +140,67 @@ export function buildMetricCumulativeSeries(input: {
 
   return points;
 }
+
+function dailyValueForRow(
+  metricKey: WorkspaceMetricKey,
+  row: MetricDayRow | undefined,
+): number | null {
+  if (!row) {
+    return null;
+  }
+  switch (metricKey) {
+    case "vtex_revenue":
+      return row.vtexRevenue ?? null;
+    case "vtex_orders":
+      return row.vtexOrders ?? null;
+    case "ga4_sessions":
+      return row.ga4Sessions ?? null;
+    case "gsc_clicks":
+      return row.gscClicks ?? null;
+    case "ga4_conversion_pct": {
+      const sessions = row.ga4Sessions ?? 0;
+      if (sessions <= 0) {
+        return null;
+      }
+      const purchases = row.ga4Purchases ?? 0;
+      return (purchases / sessions) * 100;
+    }
+    default:
+      return null;
+  }
+}
+
+/** Valores diários (não acumulados) para o mês civil; dias futuros ficam com value null. */
+export function buildMetricDailySeries(input: {
+  metricKey: WorkspaceMetricKey;
+  period: WorkspaceCalendarPeriod;
+  days: MetricDayRow[];
+  sourceStatuses: {
+    vtex: WorkspaceMetricSourceStatus;
+    ga4: WorkspaceMetricSourceStatus;
+    gsc: WorkspaceMetricSourceStatus;
+  };
+}): MetricSeriesPoint[] {
+  const startYmd = ymdFromPeriodIso(input.period.start);
+  const monthEndYmd = ymdFromPeriodIso(input.period.end);
+  const collectEndYmd = ymdFromPeriodIso(input.period.collectEnd);
+  const dayYmds = enumerateCalendarDaysInclusive(startYmd, monthEndYmd);
+
+  const byYmd = new Map<string, MetricDayRow>();
+  for (const row of input.days) {
+    byYmd.set(ymdFromCalendarDay(row.calendarDay), row);
+  }
+
+  const sourceOk =
+    sourceStatusForMetric(input.metricKey, input.sourceStatuses) === "ok";
+
+  return dayYmds.map((ymd) => {
+    if (ymd > collectEndYmd || !sourceOk) {
+      return { dateYmd: ymd, value: null };
+    }
+    return {
+      dateYmd: ymd,
+      value: dailyValueForRow(input.metricKey, byYmd.get(ymd)),
+    };
+  });
+}
