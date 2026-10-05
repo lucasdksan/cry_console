@@ -1,4 +1,5 @@
 import { auth } from "@/backend/auth";
+import { listAgentSessionsForUser } from "@/backend/models/agent-session.model";
 import {
   countWorkspacesForUser,
   listWorkspaceSummariesForUser,
@@ -18,14 +19,20 @@ export default async function Layout({
     redirect("/entrar");
   }
 
-  const [workspaces, workspaceCount] = await Promise.all([
+  const [workspaces, workspaceCount, agentSessions] = await Promise.all([
     listWorkspaceSummariesForUser(session.user.id),
     countWorkspacesForUser(session.user.id),
+    listAgentSessionsForUser(session.user.id, 15),
   ]);
 
   return (
     <PrivateShell
       workspaces={workspaces}
+      agentSessions={agentSessions.map((s) => ({
+        id: s.id,
+        title: s.title,
+        workspaceName: s.workspace?.name ?? null,
+      }))}
       workspaceLimitReached={workspaceCount >= MAX_WORKSPACES_PER_USER}
       slots={{
         session: (

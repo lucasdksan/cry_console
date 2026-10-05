@@ -1,11 +1,22 @@
 "use client";
 
-import { ChevronDown, ChevronRight, Plus, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus, Search, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Fragment, useMemo, useState } from "react";
 
+import { deleteAgentSessionAction } from "@/backend/controllers/agent.controller";
 import { logoutUser } from "@/backend/controllers/auth.controller";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/frontend/components/ui/alert-dialog";
 import { BrandLogo } from "@/frontend/components/atoms/brand-logo";
 import { NavSessionSlot } from "@/frontend/components/molecules/nav-session-slot";
 import {
@@ -60,7 +71,7 @@ function isNavItemActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function isWorkspaceRouteActive(pathname: string, item: NavLinkItem): boolean {
+function isToggleNavRouteActive(pathname: string, item: NavLinkItem): boolean {
   if (!item.children?.length) {
     return isNavItemActive(pathname, item.href);
   }
@@ -79,8 +90,12 @@ export function AppSidebar({
   ...props
 }: AppSidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const { isMobile, setOpenMobile } = useSidebar();
   const [query, setQuery] = useState("");
+  const [agentSessionPendingDelete, setAgentSessionPendingDelete] = useState<
+    string | null
+  >(null);
   const [expandedWorkspaceIds, setExpandedWorkspaceIds] = useState<
     Record<string, boolean>
   >({});
@@ -149,12 +164,28 @@ export function AppSidebar({
     if (expandedWorkspaceIds[link.id] !== undefined) {
       return expandedWorkspaceIds[link.id];
     }
-    return isWorkspaceRouteActive(pathname, link);
+    return isToggleNavRouteActive(pathname, link);
   }
 
   function toggleWorkspace(link: NavLinkItem) {
     const next = !workspaceExpanded(link);
     setExpandedWorkspaceIds((prev) => ({ ...prev, [link.id]: next }));
+  }
+
+  async function confirmDeleteAgentSession() {
+    if (!agentSessionPendingDelete) {
+      return;
+    }
+    const sessionId = agentSessionPendingDelete;
+    setAgentSessionPendingDelete(null);
+    const result = await deleteAgentSessionAction(sessionId);
+    if (result.ok) {
+      if (pathname === `/agente/${sessionId}`) {
+        router.push("/agente");
+      }
+      router.refresh();
+      closeMobileNav();
+    }
   }
 
   function renderNavLink(item: NavLinkItem) {
@@ -180,7 +211,10 @@ export function AppSidebar({
             }}
             aria-expanded={showChildren}
             className={cn(
-              "!grid w-full grid-cols-[auto_minmax(0,1fr)_1.75rem] items-center gap-2 transition-none",
+              "!grid w-full items-center gap-2 transition-none",
+              item.trailingAction
+                ? "grid-cols-[auto_minmax(0,1fr)_1.75rem_1.75rem]"
+                : "grid-cols-[auto_minmax(0,1fr)_1.75rem]",
               "focus-visible:ring-1 focus-visible:ring-sidebar-border/80",
               "data-active:bg-transparent data-active:font-normal data-active:shadow-none",
               showChildren &&
@@ -189,6 +223,22 @@ export function AppSidebar({
           >
             {Icon ? <Icon /> : null}
             <span className="truncate text-left">{item.label}</span>
+            {item.trailingAction ? (
+              <Link
+                href={item.trailingAction.href}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  closeMobileNav();
+                }}
+                className={cn(
+                  sidebarNavTrailingSlotClass,
+                  "rounded-md transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                )}
+                aria-label={item.trailingAction.ariaLabel}
+              >
+                <Plus className="size-4" />
+              </Link>
+            ) : null}
             <span className={sidebarNavTrailingSlotClass} aria-hidden>
               {showChildren ? (
                 <ChevronDown className="size-4" />
@@ -222,6 +272,39 @@ export function AppSidebar({
                 (child.href !== item.href &&
                   isNavItemActive(pathname, child.href));
               const ChildIcon = child.icon;
+              const agentSessionId = child.id.startsWith("agent-session-")
+                ? child.id.slice("agent-session-".length)
+                : null;
+              if (agentSessionId) {
+                return (
+                  <SidebarMenuSubItem key={child.id}>
+                    <div className="grid grid-cols-[minmax(0,1fr)_1.75rem] items-center gap-0.5">
+                      <SidebarMenuSubButton
+                        isActive={childActive}
+                        render={
+                          <Link href={child.href} onClick={closeMobileNav} />
+                        }
+                      >
+                        {ChildIcon ? <ChildIcon /> : null}
+                        <span className="truncate">{child.label}</span>
+                      </SidebarMenuSubButton>
+                      <button
+                        type="button"
+                        className={cn(
+                          sidebarNavTrailingSlotClass,
+                          "rounded-md text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-destructive",
+                        )}
+                        aria-label={`Excluir ${child.label}`}
+                        onClick={() =>
+                          setAgentSessionPendingDelete(agentSessionId)
+                        }
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    </div>
+                  </SidebarMenuSubItem>
+                );
+              }
               return (
                 <SidebarMenuSubItem key={child.id}>
                   <SidebarMenuSubButton
@@ -332,6 +415,30 @@ export function AppSidebar({
           </SidebarMenu>
         </SidebarFooter>
       ) : null}
+
+      <AlertDialog
+        open={agentSessionPendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAgentSessionPendingDelete(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir sessão?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta conversa será removida permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void confirmDeleteAgentSession()}>
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sidebar>
   );
 }

@@ -8,6 +8,7 @@ import {
 } from "@/frontend/navigation/nav";
 import {
   buildPrivateNavSections,
+  type AgentSessionNavSummary,
   type WorkspaceNavSummary,
 } from "@/frontend/navigation/workspace-nav";
 import { AppSidebar } from "@/frontend/components/organisms/app-sidebar";
@@ -22,6 +23,7 @@ import { Separator } from "@/frontend/components/ui/separator";
 type PrivateShellProps = {
   children: React.ReactNode;
   workspaces: WorkspaceNavSummary[];
+  agentSessions?: AgentSessionNavSummary[];
   footer?: NavFooterItem[];
   slots?: Partial<Record<"session", React.ReactNode>>;
   workspaceLimitReached?: boolean;
@@ -30,13 +32,14 @@ type PrivateShellProps = {
 export function PrivateShell({
   children,
   workspaces,
+  agentSessions = [],
   footer = defaultNavFooter,
   slots,
   workspaceLimitReached = false,
 }: PrivateShellProps) {
   const sections = useMemo(
-    () => buildPrivateNavSections(workspaces),
-    [workspaces],
+    () => buildPrivateNavSections(workspaces, agentSessions),
+    [workspaces, agentSessions],
   );
   return (
     <SidebarProvider

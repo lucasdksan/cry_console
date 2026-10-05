@@ -1,0 +1,505 @@
+"use client";
+
+import { Check, Pencil, Trash2, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import * as React from "react";
+
+import {
+  approveAgentPlan,
+  completeBrowserAgentTurn,
+  deleteAgentSessionAction,
+  listAgentModelOptions,
+  renameAgentSessionAction,
+  sendAgentMessage,
+  type AgentModelOption,
+} from "@/backend/controllers/agent.controller";
+import type {
+  AgentMessagePublic,
+  AgentSessionPublic,
+} from "@/backend/lib/agent/types";
+import { parseAgentInput } from "@/backend/lib/agent/command";
+import type { AgentChatMode } from "@/generated/prisma/client";
+import { BrandLogo } from "@/frontend/components/atoms/brand-logo";
+import { AgentMessageBubble } from "@/frontend/components/molecules/agent-message-bubble";
+import { AgentComposer } from "@/frontend/components/organisms/agent-composer";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/frontend/components/ui/alert-dialog";
+import { Button } from "@/frontend/components/ui/button";
+import { Input } from "@/frontend/components/ui/input";
+import {
+  generateChromePromptText,
+  checkChromePromptReady,
+} from "@/frontend/lib/browser/prompt";
+
+type AgentChatBoardProps = {
+  session: AgentSessionPublic | null;
+  initialMessages: AgentMessagePublic[];
+  workspaces: { id: string; name: string }[];
+};
+
+export function AgentChatBoard({
+  session,
+  initialMessages,
+  workspaces,
+}: AgentChatBoardProps) {
+  const router = useRouter();
+  const [messages, setMessages] = React.useState(initialMessages);
+  const [mode, setMode] = React.useState<AgentChatMode>(
+    session?.mode ?? "agent",
+  );
+  const [workspaceId, setWorkspaceId] = React.useState<string | null>(
+    session?.workspaceId ?? workspaces[0]?.id ?? null,
+  );
+  const [modelOptions, setModelOptions] = React.useState<AgentModelOption[]>(
+    [],
+  );
+  const [modelOptionId, setModelOptionId] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [thinkingStarted, setThinkingStarted] = React.useState<number | null>(
+    null,
+  );
+  const [, setThinkingTick] = React.useState(0);
+  const [approvingPlanId, setApprovingPlanId] = React.useState<string | null>(
+    null,
+  );
+
+  const isEmpty = messages.length === 0;
+  const showLanding = isEmpty && !session;
+
+  React.useEffect(() => {
+    setMessages(initialMessages);
+  }, [initialMessages]);
+
+  React.useEffect(() => {
+    if (session) {
+      setMode(session.mode);
+      setWorkspaceId(session.workspaceId);
+    }
+  }, [session]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const chromeReady = await checkChromePromptReady();
+      const options = await listAgentModelOptions({ chromeReady });
+      if (cancelled) {
+        return;
+      }
+      setModelOptions(options);
+      setModelOptionId((prev) =>
+        prev && options.some((o) => o.id === prev)
+          ? prev
+          : (options[0]?.id ?? ""),
+      );
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    if (!busy) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setThinkingTick((value) => value + 1);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [busy]);
+
+  const displayThinking =
+    busy && thinkingStarted !== null
+      ? Math.floor((Date.now() - thinkingStarted) / 1000)
+      : undefined;
+
+  const composerProps = {
+    mode,
+    onModeChange: setMode,
+    modelOptionId,
+    onModelOptionIdChange: setModelOptionId,
+    modelOptions,
+    workspaceId,
+    onWorkspaceIdChange: session ? undefined : setWorkspaceId,
+    workspaceChoices: workspaces,
+    workspaceLocked: Boolean(session),
+    disabled: busy,
+    thinkingSeconds: displayThinking,
+    onQuickCommand: (value: string) => void handleSend(value),
+    onSubmit: (value: string) => void handleSend(value),
+  };
+
+  async function runBrowserGeneration(input: {
+    sessionId: string;
+    userMessageId: string;
+    prompt: string;
+    mode: AgentChatMode;
+  }) {
+    const text = await generateChromePromptText(input.prompt);
+    const completed = await completeBrowserAgentTurn({
+      sessionId: input.sessionId,
+      userMessageId: input.userMessageId,
+      text,
+      mode: input.mode,
+    });
+    if (!completed.ok) {
+      throw new Error(completed.error);
+    }
+    setMessages(completed.messages);
+  }
+
+  async function handleSend(text: string) {
+    const parsed = parseAgentInput(text);
+    if (parsed.kind === "mode_only") {
+      setMode(parsed.mode);
+      if (session) {
+        setBusy(true);
+        setThinkingStarted(Date.now());
+        const result = await sendAgentMessage({
+          sessionId: session.id,
+          mode: parsed.mode,
+          modelOptionId,
+          text,
+          chromeReady: await checkChromePromptReady(),
+        });
+        setBusy(false);
+        setThinkingStarted(null);
+        if (result.ok && "messages" in result) {
+          setMessages(result.messages);
+        }
+      }
+      return;
+    }
+
+    if (mode !== "ask" && !session && !workspaceId) {
+      return;
+    }
+    if (mode !== "ask" && session?.workspaceId === null && !workspaceId) {
+      return;
+    }
+
+    setBusy(true);
+    setThinkingStarted(Date.now());
+    try {
+      const chromeReady = await checkChromePromptReady();
+      const result = await sendAgentMessage({
+        sessionId: session?.id,
+        workspaceId: session?.workspaceId ?? workspaceId,
+        mode,
+        modelOptionId,
+        text,
+        chromeReady,
+      });
+
+      if (!result.ok) {
+        throw new Error(result.error);
+      }
+
+      if (!session && result.sessionId) {
+        router.push(`/agente/${result.sessionId}`);
+        router.refresh();
+        return;
+      }
+
+      if (result.needsBrowser) {
+        await runBrowserGeneration({
+          sessionId: result.sessionId,
+          userMessageId: result.userMessageId,
+          prompt: result.prompt,
+          mode,
+        });
+      } else if (result.messages) {
+        setMessages(result.messages);
+      }
+
+      router.refresh();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Não foi possível enviar.";
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: message,
+          parts: [],
+          modelSource: null,
+          providerKey: null,
+          model: null,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+    } finally {
+      setBusy(false);
+      setThinkingStarted(null);
+    }
+  }
+
+  async function handleApprovePlan(messageId: string) {
+    if (!session) {
+      return;
+    }
+    setApprovingPlanId(messageId);
+    setBusy(true);
+    setThinkingStarted(Date.now());
+    try {
+      const chromeReady = await checkChromePromptReady();
+      const result = await approveAgentPlan({
+        sessionId: session.id,
+        planMessageId: messageId,
+        modelOptionId,
+        chromeReady,
+      });
+      if (!result.ok) {
+        throw new Error(result.error);
+      }
+      if (result.needsBrowser) {
+        await runBrowserGeneration({
+          sessionId: result.sessionId,
+          userMessageId: result.userMessageId,
+          prompt: result.prompt,
+          mode: "agent",
+        });
+      } else if ("messages" in result && result.messages) {
+        setMessages(result.messages);
+      }
+      router.refresh();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Falha ao aprovar plano.";
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: message,
+          parts: [],
+          modelSource: null,
+          providerKey: null,
+          model: null,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+    } finally {
+      setApprovingPlanId(null);
+      setBusy(false);
+      setThinkingStarted(null);
+    }
+  }
+
+  async function handleDeleteSession() {
+    if (!session) {
+      return;
+    }
+    const result = await deleteAgentSessionAction(session.id);
+    if (result.ok) {
+      router.push("/agente");
+      router.refresh();
+    }
+  }
+
+  return (
+    <div className="flex min-h-[calc(100dvh-3.5rem)] flex-col">
+      {session && !showLanding ? (
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
+          <EditableSessionTitle
+            key={session.id}
+            sessionId={session.id}
+            initialTitle={session.title}
+            workspaceName={session.workspaceName}
+          />
+          <AlertDialog>
+            <AlertDialogTrigger render={<Button variant="outline" size="sm" />}>
+              <Trash2 className="size-4" />
+              Excluir
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Excluir sessão?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Esta conversa será removida permanentemente.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={() => void handleDeleteSession()}>
+                  Excluir
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </header>
+      ) : null}
+
+      {showLanding ? (
+        <div className="flex flex-1 flex-col items-center justify-center px-4 py-6 sm:py-10">
+          <div className="flex w-full max-w-2xl flex-col gap-5">
+            <div className="flex flex-row items-center justify-center gap-4 text-left sm:gap-5">
+              <BrandLogo showName={false} size="xl" className="shrink-0" />
+              <h1 className="text-2xl font-semibold tracking-tight text-balance sm:text-4xl">
+                O que podemos fazer?
+              </h1>
+            </div>
+            <AgentComposer variant="centered" {...composerProps} />
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-1 flex-col gap-4 px-4 py-4">
+            {messages.map((message) => (
+              <AgentMessageBubble
+                key={message.id}
+                message={message}
+                onApprovePlan={handleApprovePlan}
+                approvingPlanId={approvingPlanId}
+              />
+            ))}
+          </div>
+          <div className="sticky bottom-0 z-10 -mx-4 bg-gradient-to-t from-background via-background/80 to-transparent px-4 pt-8 sm:-mx-6 sm:px-6">
+            <div className="mx-auto w-full max-w-3xl">
+              <AgentComposer variant="footer" {...composerProps} />
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function EditableSessionTitle({
+  sessionId,
+  initialTitle,
+  workspaceName,
+}: {
+  sessionId: string;
+  initialTitle: string;
+  workspaceName: string | null;
+}) {
+  const router = useRouter();
+  const [title, setTitle] = React.useState(initialTitle);
+  const [editing, setEditing] = React.useState(false);
+  const [draft, setDraft] = React.useState(initialTitle);
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  async function handleSave() {
+    if (saving) {
+      return;
+    }
+    const trimmed = draft.trim().replace(/\s+/g, " ");
+    if (!trimmed) {
+      setError("Dê um nome para a conversa.");
+      return;
+    }
+    if (trimmed.length > 80) {
+      setError("O nome deve ter até 80 caracteres.");
+      return;
+    }
+    if (trimmed === title) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    const result = await renameAgentSessionAction(sessionId, trimmed);
+    setSaving(false);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    setTitle(result.title);
+    setEditing(false);
+    router.refresh();
+  }
+
+  return (
+    <div className="min-w-0 flex-1">
+      {editing ? (
+        <form
+          className="flex max-w-md items-center gap-1.5"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void handleSave();
+          }}
+        >
+          <Input
+            value={draft}
+            maxLength={80}
+            disabled={saving}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                setDraft(title);
+                setError(null);
+                setEditing(false);
+              }
+            }}
+            placeholder="Nome da conversa"
+            aria-label="Nome da conversa"
+            className="h-9"
+          />
+          <Button
+            type="submit"
+            size="icon"
+            variant="ghost"
+            disabled={saving}
+            aria-label="Salvar nome"
+            className="size-9 shrink-0"
+          >
+            <Check className="size-4" />
+          </Button>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            disabled={saving}
+            aria-label="Cancelar edição"
+            className="size-9 shrink-0"
+            onClick={() => {
+              setDraft(title);
+              setError(null);
+              setEditing(false);
+            }}
+          >
+            <X className="size-4" />
+          </Button>
+        </form>
+      ) : (
+        <div className="group flex min-w-0 items-center gap-1.5">
+          <h1 className="truncate text-lg font-semibold tracking-tight">
+            {title}
+          </h1>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            aria-label="Renomear conversa"
+            className="size-7 shrink-0 opacity-60 transition-opacity hover:opacity-100 focus-visible:opacity-100 group-hover:opacity-100"
+            onClick={() => {
+              setDraft(title);
+              setError(null);
+              setEditing(true);
+            }}
+          >
+            <Pencil className="size-3.5" />
+          </Button>
+        </div>
+      )}
+      {error ? (
+        <p className="mt-1 text-xs text-destructive">{error}</p>
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          {workspaceName ?? "Sessão do agente"}
+        </p>
+      )}
+    </div>
+  );
+}

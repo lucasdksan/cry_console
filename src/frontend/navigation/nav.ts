@@ -1,4 +1,10 @@
-import { ExternalLink, LayoutDashboard, LogOut, type LucideIcon } from "lucide-react";
+import {
+  Bot,
+  ExternalLink,
+  LayoutDashboard,
+  LogOut,
+  type LucideIcon,
+} from "lucide-react";
 
 export type NavLinkItem = {
   type: "link";
@@ -9,6 +15,7 @@ export type NavLinkItem = {
   children?: NavLinkItem[];
   /** Só expande/recolhe filhos; navegação fica nas ações filhas. */
   toggleOnly?: boolean;
+  trailingAction?: NavGroupHeaderAction;
 };
 
 export type NavExternalItem = {
@@ -66,6 +73,19 @@ export const defaultNavSections: NavSectionItem[] = [
         label: "Visão geral",
         href: "/dashboard",
         icon: LayoutDashboard,
+      },
+      {
+        type: "link",
+        id: "agent",
+        label: "Agente",
+        href: "/agente",
+        icon: Bot,
+        toggleOnly: true,
+        trailingAction: {
+          href: "/agente",
+          ariaLabel: "Nova sessão",
+        },
+        children: [],
       },
     ],
   },

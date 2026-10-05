@@ -5,7 +5,7 @@ import { cn } from "@/frontend/lib/utils";
 type BrandLogoProps = {
   className?: string;
   showName?: boolean;
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg" | "xl";
 };
 
 export function BrandLogo({
@@ -13,7 +13,14 @@ export function BrandLogo({
   showName = true,
   size = "md",
 }: BrandLogoProps) {
-  const signetClass = size === "sm" ? "size-9" : "size-11";
+  const signetClass =
+    size === "sm"
+      ? "size-9"
+      : size === "lg"
+        ? "size-20"
+        : size === "xl"
+          ? "size-24 sm:size-28"
+          : "size-11";
   const textClass =
     size === "sm"
       ? "text-lg leading-none"

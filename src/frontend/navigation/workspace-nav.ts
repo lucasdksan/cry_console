@@ -12,8 +12,15 @@ export type WorkspaceNavSummary = {
   name: string;
 };
 
+export type AgentSessionNavSummary = {
+  id: string;
+  title: string;
+  workspaceName: string | null;
+};
+
 export function buildPrivateNavSections(
   workspaces: WorkspaceNavSummary[],
+  agentSessions: AgentSessionNavSummary[] = [],
 ): NavSectionItem[] {
   const workspaceGroup: NavGroupItem = {
     type: "group",
@@ -43,5 +50,28 @@ export function buildPrivateNavSections(
     }),
   };
 
-  return [workspaceGroup, ...defaultNavSections];
+  const sections = defaultNavSections.map((section) => {
+    if (section.type !== "group" || section.id !== "general") {
+      return section;
+    }
+    return {
+      ...section,
+      items: section.items.map((item) => {
+        if (item.type !== "link" || item.id !== "agent") {
+          return item;
+        }
+        const children: NavLinkItem[] = agentSessions.map((session) => ({
+          type: "link",
+          id: `agent-session-${session.id}`,
+          label: session.workspaceName
+            ? `${session.title} · ${session.workspaceName}`
+            : session.title,
+          href: `/agente/${session.id}`,
+        }));
+        return { ...item, children };
+      }),
+    };
+  });
+
+  return [workspaceGroup, ...sections];
 }
