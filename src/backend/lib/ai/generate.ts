@@ -5,6 +5,7 @@ import {
   readPlatformGeminiConfig,
 } from "@/backend/lib/ai/platform-config";
 import { resolveModelForProvider } from "@/backend/lib/ai/route";
+import { humanizeAiErrorInput } from "@/backend/lib/ai/error-message";
 import type { UserAiProviderCredentials } from "@/backend/models/user-ai-provider.model";
 
 const OPENAI_COMPAT_BASE: Partial<Record<AiProviderKey, string>> = {
@@ -13,26 +14,33 @@ const OPENAI_COMPAT_BASE: Partial<Record<AiProviderKey, string>> = {
 };
 
 export class AiGenerateError extends Error {
-  constructor(message: string) {
+  readonly retryable: boolean;
+  readonly httpStatus?: number;
+
+  constructor(
+    message: string,
+    options?: { retryable?: boolean; httpStatus?: number },
+  ) {
     super(message);
     this.name = "AiGenerateError";
+    this.retryable = options?.retryable ?? false;
+    this.httpStatus = options?.httpStatus;
+  }
+
+  static fromRaw(raw: string, httpStatus?: number): AiGenerateError {
+    const humanized = humanizeAiErrorInput({ raw, httpStatus });
+    return new AiGenerateError(humanized.message, {
+      retryable: humanized.retryable,
+      httpStatus: humanized.httpStatus,
+    });
   }
 }
 
-async function readResponseError(response: Response): Promise<string> {
+async function throwAiGenerateErrorFromResponse(
+  response: Response,
+): Promise<never> {
   const text = await response.text();
-  if (!text) {
-    return `HTTP ${response.status}`;
-  }
-  try {
-    const json = JSON.parse(text) as {
-      error?: { message?: string };
-      message?: string;
-    };
-    return json.error?.message ?? json.message ?? text.slice(0, 500);
-  } catch {
-    return text.slice(0, 500);
-  }
+  throw AiGenerateError.fromRaw(text || `HTTP ${response.status}`, response.status);
 }
 
 function geminiEmptyResponseMessage(response: {
@@ -55,10 +63,10 @@ function toAiGenerateError(error: unknown, fallback: string): AiGenerateError {
     return error;
   }
   if (error instanceof Error && error.message.trim()) {
-    return new AiGenerateError(error.message.trim());
+    return AiGenerateError.fromRaw(error.message.trim());
   }
   if (typeof error === "string" && error.trim()) {
-    return new AiGenerateError(error.trim());
+    return AiGenerateError.fromRaw(error.trim());
   }
   return new AiGenerateError(fallback);
 }
@@ -104,7 +112,7 @@ async function generateWithOpenAiCompat(input: {
   });
 
   if (!response.ok) {
-    throw new AiGenerateError(await readResponseError(response));
+    await throwAiGenerateErrorFromResponse(response);
   }
 
   const json = (await response.json()) as {
@@ -137,7 +145,7 @@ async function generateWithAnthropic(input: {
   });
 
   if (!response.ok) {
-    throw new AiGenerateError(await readResponseError(response));
+    await throwAiGenerateErrorFromResponse(response);
   }
 
   const json = (await response.json()) as {
