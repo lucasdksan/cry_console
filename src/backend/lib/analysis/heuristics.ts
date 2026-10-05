@@ -495,7 +495,7 @@ function buildExperiencia(input: AnalysisHeuristicsInput): AnalysisPillarCard {
   };
 }
 
-function buildOperacional(_input: AnalysisHeuristicsInput): AnalysisPillarCard {
+function buildOperacional(): AnalysisPillarCard {
   return {
     pillar: "operacional",
     title: PILLAR_TITLES.operacional,
