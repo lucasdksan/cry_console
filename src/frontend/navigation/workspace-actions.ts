@@ -1,4 +1,4 @@
-import { Bell, Settings } from "lucide-react";
+import { BarChart3, Bell, Settings } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export type WorkspaceActionDefinition = {
@@ -20,5 +20,11 @@ export const WORKSPACE_ACTION_CATALOG: WorkspaceActionDefinition[] = [
     label: "Avisos",
     icon: Bell,
     href: (workspaceId) => `/lojas/${workspaceId}/avisos`,
+  },
+  {
+    id: "analise",
+    label: "Análise",
+    icon: BarChart3,
+    href: (workspaceId) => `/lojas/${workspaceId}/analise`,
   },
 ];
