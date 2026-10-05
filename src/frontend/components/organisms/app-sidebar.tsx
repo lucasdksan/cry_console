@@ -201,7 +201,9 @@ export function AppSidebar({
       : pathname === item.href ||
         (hasChildren ? false : isNavItemActive(pathname, item.href));
     const showChildren = hasChildren && workspaceExpanded(item);
-    const showWorkspaceToggleChrome = toggleOnly && !isAgentNav;
+    const showToggleChevron = toggleOnly;
+    const showHeaderPlus =
+      toggleOnly && Boolean(item.trailingAction) && !isAgentNav;
 
     return (
       <SidebarMenuItem
@@ -217,11 +219,11 @@ export function AppSidebar({
             aria-expanded={showChildren}
             className={cn(
               "!grid w-full items-center gap-2 transition-none",
-              showWorkspaceToggleChrome
-                ? item.trailingAction
-                  ? "grid-cols-[auto_minmax(0,1fr)_1.75rem_1.75rem]"
-                  : "grid-cols-[auto_minmax(0,1fr)_1.75rem]"
-                : "grid-cols-[auto_minmax(0,1fr)]",
+              showHeaderPlus
+                ? "grid-cols-[auto_minmax(0,1fr)_1.75rem_1.75rem]"
+                : showToggleChevron
+                  ? "grid-cols-[auto_minmax(0,1fr)_1.75rem]"
+                  : "grid-cols-[auto_minmax(0,1fr)]",
               "focus-visible:ring-1 focus-visible:ring-sidebar-border/80",
               "data-active:bg-transparent data-active:font-normal data-active:shadow-none",
               showChildren &&
@@ -230,7 +232,7 @@ export function AppSidebar({
           >
             {Icon ? <Icon /> : null}
             <span className="truncate text-left">{item.label}</span>
-            {showWorkspaceToggleChrome && item.trailingAction ? (
+            {showHeaderPlus ? (
               <Link
                 href={item.trailingAction.href}
                 onClick={(event) => {
@@ -246,7 +248,7 @@ export function AppSidebar({
                 <Plus className="size-4" />
               </Link>
             ) : null}
-            {showWorkspaceToggleChrome ? (
+            {showToggleChevron ? (
               <span className={sidebarNavTrailingSlotClass} aria-hidden>
                 {showChildren ? (
                   <ChevronDown className="size-4" />
