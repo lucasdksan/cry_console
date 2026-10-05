@@ -20,6 +20,7 @@ model User {
   resetTokens       PasswordResetToken[]
   aiProviders       UserAiProvider[]
   aiUsageLogs       AiUsageLog[]
+  agentSessions     AgentSession[]
   workspaces        Workspace[]
   activeWorkspace   Workspace?  @relation("ActiveWorkspace", fields: [activeWorkspaceId], references: [id], onDelete: SetNull)
   createdAt         DateTime    @default(now())
@@ -68,6 +69,7 @@ model Workspace {
   metricDays     WorkspaceMetricDay[]
   claritySnapshots WorkspaceClaritySnapshot[]
   analysis         WorkspaceAnalysis?
+  agentSessions    AgentSession[]
 
   @@unique([userId, nameKey])
   @@index([userId])
@@ -81,6 +83,60 @@ enum WorkspaceAnalysisStatus {
 
 enum AiUsagePurpose {
   analysis
+  agent
+}
+
+enum AgentChatMode {
+  agent
+  plan
+  ask
+}
+
+enum AgentMessageRole {
+  user
+  assistant
+}
+
+enum AgentModelSource {
+  user_provider
+  platform
+  browser
+}
+
+model AgentSession {
+  id              String         @id @default(cuid())
+  userId          String
+  workspaceId     String?
+  mode            AgentChatMode  @default(agent)
+  title           String         @default("Nova conversa")
+  lastModelSource AgentModelSource?
+  lastProviderKey String?
+  lastModel       String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace Workspace?     @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  messages  AgentMessage[]
+
+  @@index([userId, updatedAt])
+  @@index([workspaceId])
+}
+
+model AgentMessage {
+  id          String           @id @default(cuid())
+  sessionId   String
+  role        AgentMessageRole
+  content     String           @db.Text
+  partsJson   Json?
+  modelSource AgentModelSource?
+  providerKey String?
+  model       String?
+  createdAt   DateTime         @default(now())
+
+  session AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
 }
 
 model WorkspaceAnalysis {
