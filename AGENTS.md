@@ -22,16 +22,36 @@ Monólito **Next.js 16** (App Router) para o Cry Console — plataforma B2B de i
 |----------|--------|
 | Nova página ou layout | `src/app/` — preferir grupos `(public)` ou `(private)` |
 | Rota HTTP / webhook | `src/app/api/...` |
-| Regra de sessão, redirect, rate limit na borda | `src/proxy.ts` + `src/backend/lib/proxy-*.ts` |
+| Regra de sessão, redirect, rate limit na borda | `src/proxy.ts` + `src/backend/lib/proxy/` |
 | Server Action ou mutação server-side | `src/backend/controllers/` (`"use server"`) |
 | Query/mutation Prisma por entidade | `src/backend/models/` |
 | Config Auth.js, callbacks | `src/backend/auth.ts`, `auth.config.ts` |
-| Utilitário backend sem I/O | `src/backend/lib/` |
+| Utilitário backend sem I/O | `src/backend/lib/<domínio>/` (ver abaixo) |
+| Helper de UI ou browser (client) | `src/frontend/lib/` — ex.: `utils.ts`, `browser/prompt.ts` |
 | Componente visual reutilizável | `src/frontend/components/` (átomos → templates) |
 | Primitivo shadcn | `src/frontend/components/ui/` |
 | Schema e migrations | `prisma/` — client gerado em `src/generated/prisma` (**não editar**) |
 
-**Evitar:** lógica de negócio ou Prisma dentro de componentes React; duplicar listas de rotas públicas fora de `proxy-routes.ts`.
+**Evitar:** lógica de negócio ou Prisma dentro de componentes React; duplicar listas de rotas públicas fora de `proxy/routes.ts`; arquivos soltos na raiz de `backend/lib` (use a pasta do domínio).
+
+### `src/backend/lib/` — pastas
+
+Código puro ou infra por domínio, **sem prefixo repetido no nome do arquivo** (ex.: `agent/prompt.ts`, não `agent/agent-prompt.ts`):
+
+| Pasta | Conteúdo |
+|-------|----------|
+| `account/` | políticas e crypto de conta |
+| `agent/` | chat, plano, gráficos do agente |
+| `ai/` | roteamento e geração de texto |
+| `analysis/` | heurísticas, LLM, scoring, DTOs |
+| `auth/` | rate limit, redirect, tokens |
+| `clarity/`, `google/`, `measurement/`, `sentry/`, `vtex/` | integrações |
+| `overview/` | visão geral e status de fontes |
+| `proxy/` | rotas públicas e política do proxy |
+| `shared/` | adaptadores usados por vários domínios |
+| `workspace/` | métricas, períodos, políticas de loja |
+
+Orquestração com I/O de banco deve ficar em **controllers** ou **models**, não em `lib`.
 
 ## Aliases TypeScript
 
@@ -59,8 +79,8 @@ Auth usa **Prisma Adapter** + sessão JWT enriquecida com `user.id` nos callback
 
 Substitui o middleware tradicional nesta versão do Next. Ao alterar comportamento de acesso:
 
-1. Atualize `publicRoutes` / helpers em `backend/lib/proxy-routes.ts`.
-2. Ajuste `resolveProxyRedirect` em `backend/lib/proxy-policy.ts` se a regra for mais complexa.
+1. Atualize `publicRoutes` / helpers em `backend/lib/proxy/routes.ts`.
+2. Ajuste `resolveProxyRedirect` em `backend/lib/proxy/policy.ts` se a regra for mais complexa.
 3. Mantenha testes em `*.test.ts` alinhados (Vitest).
 
 Matcher atual exclui `api`, assets estáticos e arquivos com extensão.
@@ -72,7 +92,8 @@ Matcher atual exclui `api`, assets estáticos e arquivos com extensão.
 
 ## Testes e qualidade
 
-- Testes unitários: `src/backend/lib/*.test.ts` — rode `pnpm test`.
+- Testes unitários (Vitest): colocalize `*.test.ts` ao lado do módulo em `src/backend/lib/**` ou `src/frontend/**` (ex.: `navigation/filter-nav.test.ts`); include: `src/**/*.test.ts` — rode `pnpm test`.
+- E2E (Playwright): `tests/e2e/` — `pnpm test:e2e`.
 - Antes de PR: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`.
 
 ## Commits (time)
