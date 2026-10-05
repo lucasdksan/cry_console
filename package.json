@@ -11,7 +11,8 @@
     "brand:export-logo": "node scripts/export-brand-logo.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
-    "postinstall": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.3",
