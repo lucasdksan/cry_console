@@ -1,6 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/backend/auth";
@@ -22,6 +21,7 @@ import {
   buildAgentPrompt,
   isValidPlanMarkdown,
 } from "@/backend/lib/agent/prompt";
+import { revalidateAgentNav } from "@/backend/lib/agent/revalidate-nav";
 import type {
   AgentMessagePublic,
   AgentModelChoice,
@@ -36,7 +36,6 @@ import {
   isPlatformGeminiConfigured,
   readPlatformGeminiConfig,
 } from "@/backend/lib/ai/platform-config";
-import type { AiProviderKey } from "@/backend/lib/ai/provider-catalog";
 import {
   labelForAiProvider,
   isAiProviderKey,
@@ -212,8 +211,7 @@ export async function createAgentSessionAction(input: {
     mode: input.mode ?? "agent",
   });
 
-  revalidatePath("/agente");
-  revalidatePath("/", "layout");
+  revalidateAgentNav();
   return { ok: true, sessionId: session.id };
 }
 
@@ -225,8 +223,7 @@ export async function deleteAgentSessionAction(
   if (!deleted) {
     return { ok: false, error: "Sessão não encontrada." };
   }
-  revalidatePath("/agente");
-  revalidatePath("/", "layout");
+  revalidateAgentNav();
   return { ok: true };
 }
 
@@ -247,9 +244,7 @@ export async function renameAgentSessionAction(
     return { ok: false, error: "Sessão não encontrada." };
   }
   await updateAgentSessionMeta({ sessionId, title: trimmed });
-  revalidatePath(`/agente/${sessionId}`);
-  revalidatePath("/agente");
-  revalidatePath("/", "layout");
+  revalidateAgentNav(sessionId);
   return { ok: true, title: trimmed };
 }
 
@@ -448,7 +443,7 @@ export async function sendAgentMessage(input: {
       sessionId: ensured.session.id,
       mode: parsed.mode,
     });
-    revalidatePath(`/agente/${ensured.session.id}`);
+    revalidateAgentNav(ensured.session.id);
     return {
       ok: true,
       sessionId: ensured.session.id,
@@ -492,9 +487,7 @@ export async function sendAgentMessage(input: {
       role: "assistant",
       content: ASK_WORKSPACE_BLOCK_MESSAGE,
     });
-    revalidatePath(`/agente/${ensured.session.id}`);
-    revalidatePath("/agente");
-    revalidatePath("/", "layout");
+    revalidateAgentNav(ensured.session.id);
     return {
       ok: true,
       sessionId: ensured.session.id,
@@ -575,6 +568,7 @@ export async function sendAgentMessage(input: {
   });
 
   if (modelChoice.source === "browser") {
+    revalidateAgentNav(session.id);
     return {
       ok: true,
       sessionId: session.id,
@@ -611,9 +605,7 @@ export async function sendAgentMessage(input: {
           content,
           parts: { parts: [chart] },
         });
-        revalidatePath(`/agente/${session.id}`);
-        revalidatePath("/agente");
-        revalidatePath("/", "layout");
+        revalidateAgentNav(session.id);
         return {
           ok: true,
           sessionId: session.id,
@@ -659,9 +651,7 @@ export async function sendAgentMessage(input: {
     }).catch(() => undefined);
   }
 
-  revalidatePath(`/agente/${session.id}`);
-  revalidatePath("/agente");
-  revalidatePath("/", "layout");
+  revalidateAgentNav(session.id);
 
   return {
     ok: true,
@@ -770,7 +760,7 @@ export async function completeBrowserAgentTurn(input: {
     lastModel: "chrome-prompt",
   });
 
-  revalidatePath(`/agente/${input.sessionId}`);
+  revalidateAgentNav(input.sessionId);
 
   return {
     ok: true,
@@ -864,7 +854,7 @@ export async function approveAgentPlan(input: {
     model: generated.modelLabel,
   });
 
-  revalidatePath(`/agente/${session.id}`);
+  revalidateAgentNav(session.id);
 
   return {
     ok: true,
