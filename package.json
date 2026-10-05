@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "brand:export-logo": "node scripts/export-brand-logo.mjs",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "test:watch": "vitest",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev"
@@ -32,7 +33,9 @@
     "picocolors": "^1.1.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "react-markdown": "^10.1.0",
     "recharts": "3.8.0",
+    "remark-gfm": "^4.0.1",
     "scheduler": "^0.28.0",
     "source-map-js": "^1.2.2",
     "tailwind-merge": "^3.7.0",
@@ -40,6 +43,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
