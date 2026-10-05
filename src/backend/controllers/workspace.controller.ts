@@ -8,9 +8,7 @@ import { auth } from "@/backend/auth";
 import { CredentialsCryptoError } from "@/backend/lib/credentials-crypto";
 import {
   assertVtexAccountFields,
-  MAX_WORKSPACES_PER_USER,
   parseGaServiceAccountJson,
-  VTEX_ENVIRONMENTS,
   workspaceBaseSchema,
 } from "@/backend/lib/workspace-policy";
 import type { SecretField } from "@/backend/lib/credentials-crypto";

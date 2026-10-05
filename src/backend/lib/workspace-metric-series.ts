@@ -1,4 +1,3 @@
-import { METRIC_VALUE_KIND } from "@/backend/lib/workspace-alert-status";
 import type { MetricDayRow } from "@/backend/models/workspace-metric.model";
 import type { WorkspaceMetricKey } from "@/generated/prisma/client";
 import type { WorkspaceMetricSourceStatus } from "@/generated/prisma/client";

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState } from "react";
 
 import {
   createWorkspace,
@@ -39,13 +39,6 @@ export function WorkspaceForm({ mode, workspace }: WorkspaceFormProps) {
     WorkspaceActionState,
     FormData
   >(action, {});
-  const [gaPropertyId, setGaPropertyId] = useState(
-    workspace?.gaPropertyId ?? "",
-  );
-
-  useEffect(() => {
-    setGaPropertyId(workspace?.gaPropertyId ?? "");
-  }, [workspace?.gaPropertyId]);
 
   const bannerError = state.error;
   const bannerSuccess = state.success;
@@ -273,8 +266,7 @@ export function WorkspaceForm({ mode, workspace }: WorkspaceFormProps) {
                 inputMode="numeric"
                 autoComplete="off"
                 placeholder="123456789"
-                value={gaPropertyId}
-                onChange={(event) => setGaPropertyId(event.target.value)}
+                defaultValue={workspace?.gaPropertyId ?? ""}
                 className="rounded-[var(--radius-md)] border-border bg-background"
               />
             </FormField>
