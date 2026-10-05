@@ -3,15 +3,15 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/backend/auth";
-import { buildOverviewDto } from "@/backend/lib/overview-metrics";
-import { lastNDaysPeriod } from "@/backend/lib/overview-period";
-import type { OverviewDTO } from "@/backend/lib/overview-types";
+import { buildOverviewDto } from "@/backend/lib/overview/metrics";
+import { lastNDaysPeriod } from "@/backend/lib/overview/period";
+import type { OverviewDTO } from "@/backend/lib/overview/types";
 import {
   isClarityConfigured,
   isGa4Configured,
   isGscConfigured,
   isVtexConfigured,
-} from "@/backend/lib/overview-status";
+} from "@/backend/lib/overview/status";
 import {
   defaultMeasurementSources,
   runMeasurementCollect,

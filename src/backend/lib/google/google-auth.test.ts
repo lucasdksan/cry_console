@@ -6,7 +6,7 @@ import {
   createServiceAccountJwt,
   getGoogleAccessToken,
 } from "@/backend/lib/google/google-auth";
-import type { GaServiceAccount } from "@/backend/lib/workspace-policy";
+import type { GaServiceAccount } from "@/backend/lib/workspace/policy";
 
 function testServiceAccount(privateKey: string): GaServiceAccount {
   return {

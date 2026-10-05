@@ -11,7 +11,7 @@ import {
 
 import { activateWorkspace } from "@/backend/controllers/workspace.controller";
 import { getWorkspaceOverview } from "@/backend/controllers/overview.controller";
-import type { OverviewDTO } from "@/backend/lib/overview-types";
+import type { OverviewDTO } from "@/backend/lib/overview/types";
 import type { WorkspaceOverviewListItem } from "@/backend/models/workspace.model";
 import { OverviewHero } from "@/frontend/components/organisms/overview-hero";
 import { OverviewSources } from "@/frontend/components/organisms/overview-sources";

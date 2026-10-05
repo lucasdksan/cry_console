@@ -9,7 +9,7 @@ import {
   YAxis,
 } from "recharts";
 
-import type { AvisosMetricCard } from "@/backend/lib/workspace-avisos-dto";
+import type { AvisosMetricCard } from "@/backend/lib/workspace/avisos-dto";
 import { Badge } from "@/frontend/components/ui/badge";
 import {
   Card,

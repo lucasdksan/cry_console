@@ -10,7 +10,7 @@ import {
   type CollectClarityInput,
   type FetchFn,
 } from "@/backend/lib/clarity/clarity-collector";
-import type { ClarityNormalized } from "@/backend/lib/normalized-adapters";
+import type { ClarityNormalized } from "@/backend/lib/shared/normalized-adapters";
 import type { MeasurementPeriod } from "@/backend/lib/measurement/schemas";
 import {
   findClaritySnapshot,

@@ -1,7 +1,7 @@
 import type { FetchFn } from "@/backend/lib/google/google-auth";
 import { clampGoogleEndDate, toGoogleApiDate } from "@/backend/lib/google/period";
-import { adaptAnalytics } from "@/backend/lib/normalized-adapters";
-import type { AnalyticsNormalized } from "@/backend/lib/normalized-adapters";
+import { adaptAnalytics } from "@/backend/lib/shared/normalized-adapters";
+import type { AnalyticsNormalized } from "@/backend/lib/shared/normalized-adapters";
 
 type Ga4MetricValue = { value?: string };
 type Ga4Row = {

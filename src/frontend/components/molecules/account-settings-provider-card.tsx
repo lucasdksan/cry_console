@@ -8,7 +8,7 @@ import {
   saveUserAiProvider,
   type AccountSettingsActionState,
 } from "@/backend/controllers/account-settings.controller";
-import { AI_PROVIDER_CATALOG } from "@/backend/lib/ai-provider-catalog";
+import { AI_PROVIDER_CATALOG } from "@/backend/lib/ai/provider-catalog";
 import type {
   UserAiProviderPublic,
   UserAiProvidersPublic,

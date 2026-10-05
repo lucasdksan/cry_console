@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/backend/auth";
-import { MAX_WORKSPACES_PER_USER } from "@/backend/lib/workspace-policy";
+import { MAX_WORKSPACES_PER_USER } from "@/backend/lib/workspace/policy";
 import {
   countWorkspacesForUser,
   listWorkspaceSummariesForUser,

@@ -1,4 +1,4 @@
-import type { OverviewDTO, OverviewSourceKey } from "@/backend/lib/overview-types";
+import type { OverviewDTO, OverviewSourceKey } from "@/backend/lib/overview/types";
 import { ClarityDeadClick } from "@/frontend/components/molecules/clarity-dead-click";
 import { Ga4FunnelStrip } from "@/frontend/components/molecules/ga4-funnel-strip";
 import { GscSearchBand } from "@/frontend/components/molecules/gsc-search-band";

@@ -1,8 +1,8 @@
 "use client";
 
-import type { OverviewDotState, OverviewSourceKey } from "@/backend/lib/overview-types";
-import { configDotsForWorkspace } from "@/backend/lib/overview-status";
-import type { OverviewDTO } from "@/backend/lib/overview-types";
+import type { OverviewDotState, OverviewSourceKey } from "@/backend/lib/overview/types";
+import { configDotsForWorkspace } from "@/backend/lib/overview/status";
+import type { OverviewDTO } from "@/backend/lib/overview/types";
 import type { WorkspaceOverviewListItem } from "@/backend/models/workspace.model";
 import { StatusDot } from "@/frontend/components/atoms/status-dot";
 import { cn } from "@/frontend/lib/utils";

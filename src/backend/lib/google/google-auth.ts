@@ -1,6 +1,6 @@
 import { createSign } from "node:crypto";
 
-import type { GaServiceAccount } from "@/backend/lib/workspace-policy";
+import type { GaServiceAccount } from "@/backend/lib/workspace/policy";
 
 export type FetchFn = (
   input: RequestInfo | URL,

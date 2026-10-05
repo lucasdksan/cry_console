@@ -3,13 +3,13 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/backend/auth";
-import { isAiProviderKey } from "@/backend/lib/ai-provider-catalog";
+import { isAiProviderKey } from "@/backend/lib/ai/provider-catalog";
 import {
   validateAiBaseUrlInput,
   validateAiModelInput,
   validateAiTokenInput,
-} from "@/backend/lib/account-settings-policy";
-import { CredentialsCryptoError } from "@/backend/lib/credentials-crypto";
+} from "@/backend/lib/account/settings-policy";
+import { CredentialsCryptoError } from "@/backend/lib/account/credentials-crypto";
 import {
   clearUserAiProviderTokenForUser,
   deleteUserAiProviderForUser,

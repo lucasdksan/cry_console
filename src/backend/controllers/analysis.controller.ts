@@ -7,21 +7,21 @@ import { auth } from "@/backend/auth";
 import {
   collectAnalysisInputs,
   isAnalysisCollectFresh,
-} from "@/backend/lib/analysis-collect";
-import { buildWorkspaceAnalysisDto } from "@/backend/lib/analysis-dto";
+} from "@/backend/lib/analysis/collect";
+import { buildWorkspaceAnalysisDto } from "@/backend/lib/analysis/dto";
 import {
   generateAnalysisNarrative,
   resolveAnalysisLlmRoute,
-} from "@/backend/lib/analysis-llm";
-import type { AnalysisMeasurementJson } from "@/backend/lib/analysis-types";
+} from "@/backend/lib/analysis/llm";
+import type { AnalysisMeasurementJson } from "@/backend/lib/analysis/types";
 import {
   isPlatformGeminiConfigured,
   readPlatformGeminiConfig,
-} from "@/backend/lib/ai-platform-config";
+} from "@/backend/lib/ai/platform-config";
 import {
   resolveAiRoute,
   type AiRouteProviderInput,
-} from "@/backend/lib/ai-route";
+} from "@/backend/lib/ai/route";
 import {
   createAiUsageLog,
   findWorkspaceAnalysisByWorkspaceId,

@@ -5,13 +5,13 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { auth } from "@/backend/auth";
-import { CredentialsCryptoError } from "@/backend/lib/credentials-crypto";
+import { CredentialsCryptoError } from "@/backend/lib/account/credentials-crypto";
 import {
   assertVtexAccountFields,
   parseGaServiceAccountJson,
   workspaceBaseSchema,
-} from "@/backend/lib/workspace-policy";
-import type { SecretField } from "@/backend/lib/credentials-crypto";
+} from "@/backend/lib/workspace/policy";
+import type { SecretField } from "@/backend/lib/account/credentials-crypto";
 import {
   deleteSentryProject,
   isSentryServerConfigured,

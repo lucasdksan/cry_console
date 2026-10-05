@@ -1,4 +1,4 @@
-import { getClientIp } from "@/backend/lib/auth-rate-limit";
+import { getClientIp } from "@/backend/lib/auth/rate-limit";
 
 export const OBSERVABILITY_TUNNEL_LIMIT = 120;
 export const OBSERVABILITY_TUNNEL_WINDOW_MS = 60_000;

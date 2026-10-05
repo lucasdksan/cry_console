@@ -8,19 +8,19 @@ import { auth } from "@/backend/auth";
 import {
   extractMetricValues,
   isSnapshotCacheFresh,
-} from "@/backend/lib/workspace-alert-metrics";
-import { buildWorkspaceAvisosDto } from "@/backend/lib/workspace-avisos-dto";
-import { resolveCalendarPeriod } from "@/backend/lib/workspace-period";
+} from "@/backend/lib/workspace/alert-metrics";
+import { buildWorkspaceAvisosDto } from "@/backend/lib/workspace/avisos-dto";
+import { resolveCalendarPeriod } from "@/backend/lib/workspace/period";
 import {
   defaultMeasurementSources,
   runMeasurementCollect,
   type MeasurementSource,
 } from "@/backend/lib/measurement";
-import { syncWorkspaceMetricDays } from "@/backend/lib/workspace-metric-daily-sync";
+import { syncWorkspaceMetricDays } from "@/backend/lib/workspace/metric-daily-sync";
 import {
   calendarDayFromYmd,
   ymdFromPeriodIso,
-} from "@/backend/lib/workspace-period";
+} from "@/backend/lib/workspace/period";
 import {
   assertWorkspaceOwnedByUser,
   deleteMetricTarget,
@@ -40,7 +40,7 @@ import {
   isGa4Configured,
   isGscConfigured,
   isVtexConfigured,
-} from "@/backend/lib/overview-status";
+} from "@/backend/lib/overview/status";
 import { runVtexCollect } from "@/backend/lib/vtex/run-collectors";
 import type { VtexCollectResult, VtexOrder } from "@/backend/lib/vtex/schemas";
 import type { MetricDayRow } from "@/backend/models/workspace-metric.model";

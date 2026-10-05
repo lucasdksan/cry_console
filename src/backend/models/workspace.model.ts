@@ -3,7 +3,7 @@ import {
   decryptSecret,
   encryptSecret,
   type SecretField,
-} from "@/backend/lib/credentials-crypto";
+} from "@/backend/lib/account/credentials-crypto";
 import type { WorkspaceMeasurementSecrets } from "@/backend/lib/measurement/run-collect";
 import {
   assertVtexAccountFields,
@@ -11,7 +11,7 @@ import {
   normalizeWorkspaceNameKey,
   parseGaServiceAccountJson,
   type VtexEnvironment,
-} from "@/backend/lib/workspace-policy";
+} from "@/backend/lib/workspace/policy";
 import { prisma } from "@/backend/models/prisma";
 import type { Prisma, Workspace } from "@/generated/prisma/client";
 

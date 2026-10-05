@@ -1,5 +1,5 @@
 import { cn } from "@/frontend/lib/utils";
-import type { OverviewDotState } from "@/backend/lib/overview-types";
+import type { OverviewDotState } from "@/backend/lib/overview/types";
 
 const dotClass: Record<OverviewDotState, string> = {
   missing: "bg-[var(--status-missing)]",

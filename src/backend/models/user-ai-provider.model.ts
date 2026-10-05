@@ -2,14 +2,14 @@ import {
   CredentialsCryptoError,
   decryptUserAiProviderSecret,
   encryptUserAiProviderSecret,
-} from "@/backend/lib/credentials-crypto";
+} from "@/backend/lib/account/credentials-crypto";
 import {
   AI_PROVIDER_CATALOG,
   AI_PROVIDER_KEYS,
   type AiProviderKey,
   isAiProviderKey,
   labelForAiProvider,
-} from "@/backend/lib/ai-provider-catalog";
+} from "@/backend/lib/ai/provider-catalog";
 import { prisma } from "@/backend/models/prisma";
 
 export type UserAiProviderPublic = {

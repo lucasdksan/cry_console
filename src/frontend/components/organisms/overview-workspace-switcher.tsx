@@ -1,6 +1,6 @@
 "use client";
 
-import type { OverviewDTO } from "@/backend/lib/overview-types";
+import type { OverviewDTO } from "@/backend/lib/overview/types";
 import type { WorkspaceOverviewListItem } from "@/backend/models/workspace.model";
 import { WorkspaceFocusChip } from "@/frontend/components/molecules/workspace-focus-chip";
 

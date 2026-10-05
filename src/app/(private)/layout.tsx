@@ -3,7 +3,7 @@ import {
   countWorkspacesForUser,
   listWorkspaceSummariesForUser,
 } from "@/backend/models/workspace.model";
-import { MAX_WORKSPACES_PER_USER } from "@/backend/lib/workspace-policy";
+import { MAX_WORKSPACES_PER_USER } from "@/backend/lib/workspace/policy";
 import { AccountSettingsSessionTrigger } from "@/frontend/components/organisms/account-settings-session-trigger";
 import { PrivateShell } from "@/frontend/components/templates/private-shell";
 import { redirect } from "next/navigation";

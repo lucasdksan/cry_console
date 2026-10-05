@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/backend/auth";
-import { MAX_WORKSPACES_PER_USER } from "@/backend/lib/workspace-policy";
+import { MAX_WORKSPACES_PER_USER } from "@/backend/lib/workspace/policy";
 import { countWorkspacesForUser } from "@/backend/models/workspace.model";
 import { WorkspaceForm } from "@/frontend/components/organisms/workspace-form";
 import { buttonVariants } from "@/frontend/components/ui/button";

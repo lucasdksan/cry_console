@@ -2,7 +2,7 @@ import { clarityNumOfDays } from "@/backend/lib/google/period";
 import {
   adaptClarity,
   type ClarityNormalized,
-} from "@/backend/lib/normalized-adapters";
+} from "@/backend/lib/shared/normalized-adapters";
 
 export type FetchFn = (
   input: RequestInfo | URL,

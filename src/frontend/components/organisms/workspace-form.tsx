@@ -8,7 +8,7 @@ import {
   updateWorkspace,
   type WorkspaceActionState,
 } from "@/backend/controllers/workspace.controller";
-import { VTEX_ENVIRONMENTS } from "@/backend/lib/workspace-policy";
+import { VTEX_ENVIRONMENTS } from "@/backend/lib/workspace/policy";
 import type { WorkspacePublic } from "@/backend/models/workspace.model";
 import { FormField } from "@/frontend/components/atoms/form-field";
 import { NativeSelect } from "@/frontend/components/atoms/native-select";

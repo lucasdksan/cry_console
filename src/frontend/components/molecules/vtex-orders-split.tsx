@@ -1,4 +1,4 @@
-import type { OverviewVtexVisual } from "@/backend/lib/overview-types";
+import type { OverviewVtexVisual } from "@/backend/lib/overview/types";
 
 type VtexOrdersSplitProps = {
   data: OverviewVtexVisual;

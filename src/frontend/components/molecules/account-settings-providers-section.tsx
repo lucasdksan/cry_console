@@ -6,7 +6,7 @@ import {
   saveUserAiProvider,
   type AccountSettingsActionState,
 } from "@/backend/controllers/account-settings.controller";
-import { AI_PROVIDER_CATALOG } from "@/backend/lib/ai-provider-catalog";
+import { AI_PROVIDER_CATALOG } from "@/backend/lib/ai/provider-catalog";
 import type { UserAiProvidersPublic } from "@/backend/models/user-ai-provider.model";
 import { AccountSettingsProviderCard } from "@/frontend/components/molecules/account-settings-provider-card";
 import { NativeSelect } from "@/frontend/components/atoms/native-select";

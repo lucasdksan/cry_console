@@ -1,6 +1,6 @@
 "use client";
 
-import type { SecretField } from "@/backend/lib/credentials-crypto";
+import type { SecretField } from "@/backend/lib/account/credentials-crypto";
 import { FormField } from "@/frontend/components/atoms/form-field";
 import { PasswordInput } from "@/frontend/components/atoms/password-input";
 import { Badge } from "@/frontend/components/ui/badge";

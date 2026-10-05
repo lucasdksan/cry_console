@@ -1,4 +1,4 @@
-import type { OverviewHeroKpi } from "@/backend/lib/overview-types";
+import type { OverviewHeroKpi } from "@/backend/lib/overview/types";
 import { KpiStat } from "@/frontend/components/molecules/kpi-stat";
 import { Skeleton } from "@/frontend/components/ui/skeleton";
 

@@ -1,5 +1,5 @@
-import { getAuthErrorMessage } from "@/backend/lib/auth-errors";
-import { sanitizeRedirectPath } from "@/backend/lib/redirect";
+import { getAuthErrorMessage } from "@/backend/lib/auth/errors";
+import { sanitizeRedirectPath } from "@/backend/lib/auth/redirect";
 import { AuthFooterLink } from "@/frontend/components/molecules/auth-footer-link";
 import { LoginForm } from "@/frontend/components/organisms/login-form";
 import { AuthCardTemplate } from "@/frontend/components/templates/auth-card-template";

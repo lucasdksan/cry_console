@@ -8,8 +8,8 @@ import {
   retryWorkspaceAnalysisNarrative,
   runWorkspaceAnalysis,
 } from "@/backend/controllers/analysis.controller";
-import type { WorkspaceAnalysisDTO } from "@/backend/lib/analysis-types";
-import { PILLAR_TITLES } from "@/backend/lib/analysis-types";
+import type { WorkspaceAnalysisDTO } from "@/backend/lib/analysis/types";
+import { PILLAR_TITLES } from "@/backend/lib/analysis/types";
 import { Badge } from "@/frontend/components/ui/badge";
 import { Button } from "@/frontend/components/ui/button";
 import {

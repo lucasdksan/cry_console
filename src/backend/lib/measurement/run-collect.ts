@@ -18,10 +18,10 @@ import type {
   MeasurementSourceResult,
 } from "@/backend/lib/measurement/schemas";
 import { defaultMeasurementSources } from "@/backend/lib/measurement/schemas";
-import type { AnalyticsNormalized } from "@/backend/lib/normalized-adapters";
-import type { ClarityNormalized } from "@/backend/lib/normalized-adapters";
-import type { SearchConsoleNormalized } from "@/backend/lib/normalized-adapters";
-import type { GaServiceAccount } from "@/backend/lib/workspace-policy";
+import type { AnalyticsNormalized } from "@/backend/lib/shared/normalized-adapters";
+import type { ClarityNormalized } from "@/backend/lib/shared/normalized-adapters";
+import type { SearchConsoleNormalized } from "@/backend/lib/shared/normalized-adapters";
+import type { GaServiceAccount } from "@/backend/lib/workspace/policy";
 import type { MeasurementPeriod } from "@/backend/lib/measurement/schemas";
 
 export type WorkspaceMeasurementSecrets = {

@@ -6,8 +6,8 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { signIn, signOut } from "@/backend/auth";
-import { sanitizeRedirectPath } from "@/backend/lib/redirect";
-import { createResetToken, hashResetToken } from "@/backend/lib/tokens";
+import { sanitizeRedirectPath } from "@/backend/lib/auth/redirect";
+import { createResetToken, hashResetToken } from "@/backend/lib/auth/tokens";
 import {
   createPasswordResetToken,
   findValidPasswordResetToken,

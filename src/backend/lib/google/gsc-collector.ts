@@ -7,7 +7,7 @@ import {
 import {
   adaptSearchConsole,
   type SearchConsoleNormalized,
-} from "@/backend/lib/normalized-adapters";
+} from "@/backend/lib/shared/normalized-adapters";
 
 type GscQueryResponse = {
   rows?: Array<{

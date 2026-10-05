@@ -7,15 +7,15 @@ import {
   AiGenerateError,
   generateTextWithPlatformGemini,
   generateTextWithUserProvider,
-} from "@/backend/lib/ai-generate";
-import { isPlatformGeminiConfigured } from "@/backend/lib/ai-platform-config";
+} from "@/backend/lib/ai/generate";
+import { isPlatformGeminiConfigured } from "@/backend/lib/ai/platform-config";
 import {
   resolveAiRoute,
   validateUserProviderConfig,
   type AiRouteProviderInput,
-} from "@/backend/lib/ai-route";
-import type { AiProviderKey } from "@/backend/lib/ai-provider-catalog";
-import { CredentialsCryptoError } from "@/backend/lib/credentials-crypto";
+} from "@/backend/lib/ai/route";
+import type { AiProviderKey } from "@/backend/lib/ai/provider-catalog";
+import { CredentialsCryptoError } from "@/backend/lib/account/credentials-crypto";
 import {
   listUserAiProvidersForRouting,
   loadUserAiProviderCredentials,

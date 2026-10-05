@@ -1,5 +1,5 @@
 import { prisma } from "@/backend/models/prisma";
-import type { ClarityNormalized } from "@/backend/lib/normalized-adapters";
+import type { ClarityNormalized } from "@/backend/lib/shared/normalized-adapters";
 import type {
   WorkspaceClaritySnapshot,
   WorkspaceMetricSourceStatus,

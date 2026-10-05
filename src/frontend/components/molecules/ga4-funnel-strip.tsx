@@ -1,4 +1,4 @@
-import type { OverviewGa4Visual } from "@/backend/lib/overview-types";
+import type { OverviewGa4Visual } from "@/backend/lib/overview/types";
 
 type Ga4FunnelStripProps = {
   data: OverviewGa4Visual;

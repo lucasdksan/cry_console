@@ -3,7 +3,7 @@ import { generateKeyPairSync } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 
 import { runMeasurementCollect } from "@/backend/lib/measurement/run-collect";
-import type { GaServiceAccount } from "@/backend/lib/workspace-policy";
+import type { GaServiceAccount } from "@/backend/lib/workspace/policy";
 
 function testServiceAccount(privateKey: string): GaServiceAccount {
   return {

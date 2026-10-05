@@ -5,7 +5,7 @@ import { useCallback, useMemo, useState, useTransition } from "react";
 import type { WorkspaceMetricKey } from "@/generated/prisma/client";
 
 import { getWorkspaceAvisos } from "@/backend/controllers/alert.controller";
-import type { WorkspaceAvisosDTO } from "@/backend/lib/workspace-avisos-dto";
+import type { WorkspaceAvisosDTO } from "@/backend/lib/workspace/avisos-dto";
 import { AvisoMetricCard } from "@/frontend/components/molecules/aviso-metric-card";
 import { AvisoMetricChart } from "@/frontend/components/organisms/aviso-metric-chart";
 import { SourceErrorPanel } from "@/frontend/components/molecules/source-error-panel";

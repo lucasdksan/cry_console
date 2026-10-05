@@ -7,7 +7,7 @@ import {
   saveWorkspaceMetricTarget,
   type AlertActionState,
 } from "@/backend/controllers/alert.controller";
-import type { AvisosMetricCard } from "@/backend/lib/workspace-avisos-dto";
+import type { AvisosMetricCard } from "@/backend/lib/workspace/avisos-dto";
 import { FormField } from "@/frontend/components/atoms/form-field";
 import { Badge } from "@/frontend/components/ui/badge";
 import { Button } from "@/frontend/components/ui/button";

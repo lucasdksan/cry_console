@@ -1,4 +1,4 @@
-import type { OverviewClarityVisual } from "@/backend/lib/overview-types";
+import type { OverviewClarityVisual } from "@/backend/lib/overview/types";
 
 type ClarityDeadClickProps = {
   data: OverviewClarityVisual;

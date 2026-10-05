@@ -6,9 +6,9 @@ import {
   AUTH_WINDOW_MS,
   checkAuthRateLimit,
   getClientIp,
-} from "@/backend/lib/auth-rate-limit";
-import { isAuthRateLimitPath } from "@/backend/lib/proxy-routes";
-import { resolveProxyRedirect } from "@/backend/lib/proxy-policy";
+} from "@/backend/lib/auth/rate-limit";
+import { isAuthRateLimitPath } from "@/backend/lib/proxy/routes";
+import { resolveProxyRedirect } from "@/backend/lib/proxy/policy";
 
 function nextWithPathname(req: NextRequest) {
   const requestHeaders = new Headers(req.headers);

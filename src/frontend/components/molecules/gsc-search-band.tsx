@@ -1,4 +1,4 @@
-import type { OverviewGscVisual } from "@/backend/lib/overview-types";
+import type { OverviewGscVisual } from "@/backend/lib/overview/types";
 
 type GscSearchBandProps = {
   data: OverviewGscVisual;

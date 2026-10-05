@@ -1,4 +1,4 @@
-import { sanitizeRedirectPath } from "@/backend/lib/redirect";
+import { sanitizeRedirectPath } from "@/backend/lib/auth/redirect";
 import { AuthFooterLink } from "@/frontend/components/molecules/auth-footer-link";
 import { RegisterForm } from "@/frontend/components/organisms/register-form";
 import { AuthCardTemplate } from "@/frontend/components/templates/auth-card-template";
