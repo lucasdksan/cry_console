@@ -19,6 +19,7 @@ model User {
   sessions          Session[]
   resetTokens       PasswordResetToken[]
   aiProviders       UserAiProvider[]
+  aiUsageLogs       AiUsageLog[]
   workspaces        Workspace[]
   activeWorkspace   Workspace?  @relation("ActiveWorkspace", fields: [activeWorkspaceId], references: [id], onDelete: SetNull)
   createdAt         DateTime    @default(now())
@@ -66,9 +67,60 @@ model Workspace {
   metricSnapshots WorkspaceMetricSnapshot[]
   metricDays     WorkspaceMetricDay[]
   claritySnapshots WorkspaceClaritySnapshot[]
+  analysis         WorkspaceAnalysis?
 
   @@unique([userId, nameKey])
   @@index([userId])
+}
+
+enum WorkspaceAnalysisStatus {
+  measured
+  complete
+  narrative_failed
+}
+
+enum AiUsagePurpose {
+  analysis
+}
+
+model WorkspaceAnalysis {
+  id              String                  @id @default(cuid())
+  workspaceId     String                  @unique
+  periodStart     DateTime
+  periodEnd       DateTime
+  periodLabel     String
+  overallScore    Int?
+  overallStatus   String
+  measurementJson Json
+  narrativeJson   Json?
+  status          WorkspaceAnalysisStatus
+  aiProviderKey   String?
+  aiModel         String?
+  aiRoute         String?
+  collectedAt     DateTime
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model AiUsageLog {
+  id           String         @id @default(cuid())
+  userId       String
+  workspaceId  String
+  purpose      AiUsagePurpose
+  route        String
+  providerKey  String?
+  model        String?
+  createdAt    DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([workspaceId])
+  @@index([createdAt])
 }
 
 enum WorkspaceMetricPeriodType {
