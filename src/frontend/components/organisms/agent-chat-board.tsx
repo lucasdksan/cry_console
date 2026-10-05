@@ -20,6 +20,10 @@ import type {
 import { parseAgentInput } from "@/backend/lib/agent/command";
 import type { AgentChatMode } from "@/generated/prisma/client";
 import { BrandLogo } from "@/frontend/components/atoms/brand-logo";
+import {
+  AgentChatErrorAlert,
+  type AgentChatErrorState,
+} from "@/frontend/components/molecules/agent-chat-error-alert";
 import { AgentMessageBubble } from "@/frontend/components/molecules/agent-message-bubble";
 import { AgentComposer } from "@/frontend/components/organisms/agent-composer";
 import {
@@ -72,6 +76,8 @@ export function AgentChatBoard({
   );
   const sessionTitleRef = React.useRef<EditableSessionTitleHandle>(null);
   const [sessionTitleEditing, setSessionTitleEditing] = React.useState(false);
+  const [operationError, setOperationError] =
+    React.useState<AgentChatErrorState | null>(null);
 
   const isEmpty = messages.length === 0;
   const showLanding = isEmpty && !session;
@@ -175,6 +181,7 @@ export function AgentChatBoard({
 
     setBusy(true);
     setThinkingTick(0);
+    setOperationError(null);
     try {
       const chromeReady = await checkChromePromptReady();
       const result = await sendAgentMessage({
@@ -187,7 +194,13 @@ export function AgentChatBoard({
       });
 
       if (!result.ok) {
-        throw new Error(result.error);
+        setOperationError({
+          message: result.error,
+          retryable: result.retryable ?? false,
+        });
+        await refreshAgentNav();
+        router.refresh();
+        return;
       }
 
       if (!session && result.sessionId) {
@@ -211,21 +224,11 @@ export function AgentChatBoard({
       await refreshAgentNav();
       router.refresh();
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Não foi possível enviar.";
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: message,
-          parts: [],
-          modelSource: null,
-          providerKey: null,
-          model: null,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
+      setOperationError({
+        message:
+          error instanceof Error ? error.message : "Não foi possível enviar.",
+        retryable: false,
+      });
     } finally {
       setBusy(false);
     }
@@ -238,6 +241,7 @@ export function AgentChatBoard({
     setApprovingPlanId(messageId);
     setBusy(true);
     setThinkingTick(0);
+    setOperationError(null);
     try {
       const chromeReady = await checkChromePromptReady();
       const result = await approveAgentPlan({
@@ -247,7 +251,11 @@ export function AgentChatBoard({
         chromeReady,
       });
       if (!result.ok) {
-        throw new Error(result.error);
+        setOperationError({
+          message: result.error,
+          retryable: result.retryable ?? false,
+        });
+        return;
       }
       if (result.needsBrowser) {
         await runBrowserGeneration({
@@ -262,21 +270,11 @@ export function AgentChatBoard({
       await refreshAgentNav();
       router.refresh();
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Falha ao aprovar plano.";
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: message,
-          parts: [],
-          modelSource: null,
-          providerKey: null,
-          model: null,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
+      setOperationError({
+        message:
+          error instanceof Error ? error.message : "Falha ao aprovar plano.",
+        retryable: false,
+      });
     } finally {
       setApprovingPlanId(null);
       setBusy(false);
@@ -358,6 +356,12 @@ export function AgentChatBoard({
       ) : (
         <>
           <div className="flex flex-1 flex-col gap-4 px-4 py-4">
+            {operationError ? (
+              <AgentChatErrorAlert
+                error={operationError}
+                onDismiss={() => setOperationError(null)}
+              />
+            ) : null}
             {messages.map((message) => (
               <AgentMessageBubble
                 key={message.id}
