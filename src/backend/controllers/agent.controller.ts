@@ -13,7 +13,17 @@ import {
   buildChartPartForWorkspaceCommand,
   buildSkillChartPart,
 } from "@/backend/lib/agent/chart";
-import { buildAgentMessageParts } from "@/backend/lib/agent/parts";
+import {
+  buildAgentMessageParts,
+  computeArtifactsFromText,
+  mergePlanArtifacts,
+} from "@/backend/lib/agent/parts";
+import { parsePlanQuestionsFromText } from "@/backend/lib/agent/plan-questions";
+import { classifyPlanAssistantTurn } from "@/backend/lib/agent/plan-turn";
+import {
+  buildWorkflowPartFromActionPlanItems,
+  buildWorkflowPartFromPlanMarkdown,
+} from "@/backend/lib/agent/workflow";
 import {
   buildAgentSkillDigestSection,
   metricLabelsForKeys,
@@ -31,6 +41,7 @@ import {
 } from "@/backend/lib/agent/prompt";
 import { revalidateAgentNav } from "@/backend/lib/agent/revalidate-nav";
 import type {
+  AgentMessageParts,
   AgentMessagePublic,
   AgentModelChoice,
   AgentSessionPublic,
@@ -55,6 +66,7 @@ import {
 import { CredentialsCryptoError } from "@/backend/lib/account/credentials-crypto";
 import {
   appendAgentMessage,
+  updateAgentMessageParts,
   createAgentSession,
   deleteAgentSessionForUser,
   findAgentSessionForUser,
@@ -585,6 +597,10 @@ export async function sendAgentMessage(input: {
     content: messageText,
   });
 
+  if (mode === "plan") {
+    await markLatestPlanQuestionsAnswered(session.id);
+  }
+
   if (session.title === "Nova conversa") {
     await updateAgentSessionMeta({
       sessionId: session.id,
@@ -733,6 +749,33 @@ export async function sendAgentMessage(input: {
   };
 }
 
+async function markLatestPlanQuestionsAnswered(
+  sessionId: string,
+): Promise<void> {
+  const rows = await listAgentMessages(sessionId);
+  for (let i = rows.length - 1; i >= 0; i -= 1) {
+    const row = rows[i];
+    if (row.role !== "assistant") {
+      continue;
+    }
+    const parts = parseMessageParts(row.partsJson);
+    const hasOpen = parts.some(
+      (p) => p.type === "plan_questions" && !p.answered,
+    );
+    if (!hasOpen) {
+      return;
+    }
+    const marked: AgentMessageParts["parts"] = parts.map((p) =>
+      p.type === "plan_questions" ? { ...p, answered: true } : p,
+    );
+    await updateAgentMessageParts({
+      messageId: row.id,
+      parts: { parts: marked },
+    });
+    return;
+  }
+}
+
 async function buildAssistantParts(input: {
   mode: AgentChatMode;
   text: string;
@@ -751,23 +794,51 @@ async function buildAssistantParts(input: {
   });
 
   if (input.mode === "plan" && !input.agentSkillTurn) {
-    let content = built.content;
-    if (!isValidPlanMarkdown(content)) {
-      content = `# Plano proposto\n\n${content}`;
+    const turn = classifyPlanAssistantTurn(built.content);
+    if (turn === "questions") {
+      const questionsPart = parsePlanQuestionsFromText(built.content);
+      if (questionsPart) {
+        return {
+          content: built.content,
+          parts: [questionsPart],
+        };
+      }
+      return { content: built.content, parts: [] };
     }
-    const parts: import("@/backend/lib/agent/types").AgentMessageParts["parts"] =
-      [
-        {
-          type: "plan_pending",
-          markdown: content,
-          artifacts: built.artifacts,
-        },
-        ...built.parts,
-      ];
-    return { content, parts };
+    const content = built.content;
+    if (!isValidPlanMarkdown(content)) {
+      return { content: built.content, parts: [] };
+    }
+    const planParts: AgentMessageParts["parts"] = [
+      {
+        type: "plan_pending",
+        markdown: content,
+        artifacts: built.artifacts,
+        accepted: false,
+      },
+    ];
+    return { content, parts: planParts };
   }
 
   return { content: built.content, parts: built.parts };
+}
+
+function appendWorkflowPartToDelivery(
+  parts: AgentMessageParts["parts"],
+  planMarkdown: string,
+): AgentMessageParts["parts"] {
+  const fromPlan = buildWorkflowPartFromPlanMarkdown(planMarkdown);
+  if (fromPlan) {
+    return [fromPlan, ...parts];
+  }
+  const actionPlan = parts.find((p) => p.type === "action_plan");
+  if (actionPlan?.type === "action_plan") {
+    const fromActions = buildWorkflowPartFromActionPlanItems(actionPlan.items);
+    if (fromActions) {
+      return [fromActions, ...parts];
+    }
+  }
+  return parts;
 }
 
 export async function completeBrowserAgentTurn(input: {
@@ -929,21 +1000,43 @@ export async function approveAgentPlan(input: {
     };
   }
 
+  const fallbackArtifacts = pending.artifacts ?? {
+    chartMetrics: [],
+    projectionMetrics: [],
+    funnel: false,
+    actionPlan: false,
+  };
+  const fromDelivery = computeArtifactsFromText({ text: generated.text });
+  const mergedArtifacts = mergePlanArtifacts(fromDelivery, fallbackArtifacts);
+
   const built = await buildAssistantParts({
     mode: "agent",
     text: generated.text,
     workspaceContext,
-    replayArtifacts: pending.artifacts,
+    replayArtifacts: mergedArtifacts,
   });
+
+  const deliveryParts = appendWorkflowPartToDelivery(
+    built.parts,
+    pending.markdown,
+  );
 
   await appendAgentMessage({
     sessionId: session.id,
     role: "assistant",
     content: built.content,
-    parts: built.parts.length ? { parts: built.parts } : null,
+    parts: deliveryParts.length ? { parts: deliveryParts } : null,
     modelSource: generated.modelSource,
     providerKey: generated.providerKey,
     model: generated.modelLabel,
+  });
+
+  const markedPlanParts: AgentMessageParts["parts"] = parts.map((p) =>
+    p.type === "plan_pending" ? { ...p, accepted: true } : p,
+  );
+  await updateAgentMessageParts({
+    messageId: planMessage.id,
+    parts: { parts: markedPlanParts },
   });
 
   revalidateAgentNav(session.id);

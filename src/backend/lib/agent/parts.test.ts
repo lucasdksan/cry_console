@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildAgentMessageParts } from "@/backend/lib/agent/parts";
+import {
+  buildAgentMessageParts,
+  computeArtifactsFromText,
+  mergePlanArtifacts,
+} from "@/backend/lib/agent/parts";
 import type { AgentWorkspaceContext } from "@/backend/lib/agent/context";
 
 describe("buildAgentMessageParts", () => {
@@ -34,7 +38,7 @@ describe("buildAgentMessageParts", () => {
     },
   } satisfies AgentWorkspaceContext;
 
-  it("modo plan guarda artifacts e preview de projeção", () => {
+  it("modo plan guarda artifacts sem partes visuais", () => {
     const built = buildAgentMessageParts({
       mode: "plan",
       text: "Plano\n[[projection:vtex_revenue]]",
@@ -68,7 +72,20 @@ describe("buildAgentMessageParts", () => {
       workspaceCommand: { kind: "projection", metricHint: "receita" },
     });
     expect(built.artifacts.projectionMetrics).toContain("vtex_revenue");
-    expect(built.parts.some((p) => p.type === "projection")).toBe(true);
+    expect(built.parts.some((p) => p.type === "projection")).toBe(false);
+  });
+
+  it("mergePlanArtifacts combina marcadores da entrega com fallback do plano", () => {
+    const fromText = computeArtifactsFromText({ text: "Entrega\n[[funnel]]" });
+    const merged = mergePlanArtifacts(fromText, {
+      chartMetrics: ["vtex_revenue"],
+      projectionMetrics: [],
+      funnel: false,
+      actionPlan: true,
+    });
+    expect(merged.funnel).toBe(true);
+    expect(merged.chartMetrics).toContain("vtex_revenue");
+    expect(merged.actionPlan).toBe(true);
   });
 
   it("replay de artifacts ignora marcadores no texto", () => {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   AGENT_RESPONSE_STYLE_HINT,
+  buildAgentPrompt,
   buildAgentSystemInstruction,
   isValidPlanMarkdown,
 } from "@/backend/lib/agent/prompt";
@@ -20,5 +21,21 @@ describe("buildAgentSystemInstruction", () => {
     const instruction = buildAgentSystemInstruction("agent");
     expect(instruction).toContain(AGENT_RESPONSE_STYLE_HINT);
     expect(instruction).toMatch(/Evite títulos com #/);
+  });
+
+  it("modo plan não menciona marcadores visuais na instrução base", () => {
+    const instruction = buildAgentSystemInstruction("plan");
+    expect(instruction).toMatch(/Não use marcadores visuais/);
+  });
+});
+
+describe("buildAgentPrompt", () => {
+  it("inclui fase de descoberta sem histórico", () => {
+    const prompt = buildAgentPrompt({
+      mode: "plan",
+      userMessage: "Melhorar conversões",
+      history: [],
+    });
+    expect(prompt).toMatch(/Fase de descoberta/);
   });
 });

@@ -20,8 +20,13 @@ export function AgentPlanCard({
   return (
     <div className="flex w-full flex-col gap-4">
       <AgentMarkdown content={part.markdown} />
-      <div className="flex justify-end">
-        <Button type="button" onClick={onApprove} disabled={approving}>
+      <div className="flex w-full justify-stretch sm:justify-end">
+        <Button
+          type="button"
+          className="w-full sm:w-auto"
+          onClick={onApprove}
+          disabled={approving}
+        >
           {approving ? <Loader2 className="size-4 animate-spin" /> : null}
           {approving ? "Gerando…" : "Aceitar e gerar"}
         </Button>

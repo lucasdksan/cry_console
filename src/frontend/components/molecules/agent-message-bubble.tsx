@@ -8,7 +8,9 @@ import { AgentChartBlock } from "@/frontend/components/molecules/agent-chart-blo
 import { AgentFunnelBlock } from "@/frontend/components/molecules/agent-funnel-block";
 import { AgentMarkdown } from "@/frontend/components/molecules/agent-markdown";
 import { AgentPlanCard } from "@/frontend/components/molecules/agent-plan-card";
+import { AgentPlanQuestionsCard } from "@/frontend/components/molecules/agent-plan-questions-card";
 import { AgentProjectionBlock } from "@/frontend/components/molecules/agent-projection-block";
+import { AgentWorkflowBlock } from "@/frontend/components/molecules/agent-workflow-block";
 import { Badge } from "@/frontend/components/ui/badge";
 import { splitUserMessageAttachments } from "@/frontend/lib/agent/attachments";
 import { cn } from "@/frontend/lib/utils";
@@ -17,24 +19,50 @@ type AgentMessageBubbleProps = {
   message: AgentMessagePublic;
   onApprovePlan?: (messageId: string) => void;
   approvingPlanId?: string | null;
+  onSubmitPlanAnswers?: (answers: Record<string, string>) => void;
+  submittingPlanAnswers?: boolean;
+  activePlanQuestionsMessageId?: string | null;
 };
 
 export function AgentMessageBubble({
   message,
   onApprovePlan,
   approvingPlanId,
+  onSubmitPlanAnswers,
+  submittingPlanAnswers = false,
+  activePlanQuestionsMessageId = null,
 }: AgentMessageBubbleProps) {
   const isUser = message.role === "user";
   const planPart = message.parts.find((p) => p.type === "plan_pending");
+  const planQuestionsPart = message.parts.find(
+    (p) => p.type === "plan_questions",
+  );
   const { body, attachmentNames } = isUser
     ? splitUserMessageAttachments(message.content)
     : { body: message.content, attachmentNames: [] };
   const bodyText = body || (isUser ? message.content : "");
+  const planAccepted =
+    planPart?.type === "plan_pending" && Boolean(planPart.accepted);
   const showPlan =
-    !isUser && planPart?.type === "plan_pending" && Boolean(onApprovePlan);
+    !isUser &&
+    planPart?.type === "plan_pending" &&
+    !planAccepted &&
+    Boolean(onApprovePlan);
   const planRepeatsBody =
     showPlan &&
     planPart.markdown.trim() === (bodyText || message.content).trim();
+  const showPlanQuestionsBox =
+    !isUser &&
+    planQuestionsPart?.type === "plan_questions" &&
+    !planQuestionsPart.answered &&
+    activePlanQuestionsMessageId === message.id &&
+    Boolean(onSubmitPlanAnswers);
+  const planQuestionsAnswered =
+    planQuestionsPart?.type === "plan_questions" &&
+    Boolean(planQuestionsPart.answered);
+  const hideAssistantBodyForQuestions =
+    planQuestionsPart?.type === "plan_questions" &&
+    (showPlanQuestionsBox || planQuestionsAnswered);
 
   return (
     <div
@@ -61,12 +89,20 @@ export function AgentMessageBubble({
               <p className="whitespace-pre-wrap">{bodyText}</p>
             ) : null}
           </div>
-        ) : !planRepeatsBody && bodyText ? (
+        ) : planQuestionsAnswered &&
+          planQuestionsPart?.type === "plan_questions" &&
+          planQuestionsPart.intro ? (
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            {planQuestionsPart.intro}
+          </p>
+        ) : bodyText &&
+          (!planRepeatsBody || planAccepted) &&
+          !hideAssistantBodyForQuestions ? (
           <AgentMarkdown content={bodyText} />
         ) : null}
         {!isUser &&
           message.parts.map((part, index) => {
-            if (part.type === "plan_pending") {
+            if (part.type === "plan_pending" || part.type === "plan_questions") {
               return null;
             }
             const key = `${part.type}-${index}`;
@@ -84,10 +120,21 @@ export function AgentMessageBubble({
                 return wrap(<AgentFunnelBlock part={part} />);
               case "action_plan":
                 return wrap(<AgentActionPlanBlock part={part} />);
+              case "workflow":
+                return wrap(<AgentWorkflowBlock part={part} />);
               default:
                 return null;
             }
           })}
+        {showPlanQuestionsBox &&
+        planQuestionsPart?.type === "plan_questions" &&
+        onSubmitPlanAnswers ? (
+          <AgentPlanQuestionsCard
+            part={planQuestionsPart}
+            onSubmit={onSubmitPlanAnswers}
+            submitting={submittingPlanAnswers}
+          />
+        ) : null}
         {showPlan && planPart?.type === "plan_pending" && onApprovePlan ? (
           <AgentPlanCard
             part={planPart}

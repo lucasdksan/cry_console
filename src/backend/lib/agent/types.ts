@@ -81,6 +81,45 @@ export type AgentPlanPendingPart = {
   type: "plan_pending";
   markdown: string;
   artifacts?: AgentPlanArtifacts;
+  accepted?: boolean;
+};
+
+export type AgentPlanQuestionItem = {
+  id: string;
+  prompt: string;
+  suggestions: string[];
+};
+
+export type AgentPlanQuestionsPart = {
+  type: "plan_questions";
+  intro?: string;
+  questions: AgentPlanQuestionItem[];
+  answered?: boolean;
+};
+
+export type AgentWorkflowStep = {
+  id: string;
+  label: string;
+  detail?: string;
+};
+
+export type AgentWorkflowPhase = {
+  id: string;
+  title: string;
+  steps: AgentWorkflowStep[];
+};
+
+export type AgentWorkflowNode = {
+  id: string;
+  label: string;
+  detail?: string;
+};
+
+export type AgentWorkflowPart = {
+  type: "workflow";
+  title: string;
+  phases?: AgentWorkflowPhase[];
+  nodes?: AgentWorkflowNode[];
 };
 
 export type AgentActionPlanItem = {
@@ -107,7 +146,9 @@ export type AgentMessageParts = {
     | AgentProjectionPart
     | AgentFunnelPart
     | AgentPlanPendingPart
+    | AgentPlanQuestionsPart
     | AgentActionPlanPart
+    | AgentWorkflowPart
   )[];
 };
 

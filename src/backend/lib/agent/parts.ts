@@ -53,6 +53,36 @@ function emptyArtifacts(): AgentPlanArtifacts {
   };
 }
 
+export function mergePlanArtifacts(
+  primary: AgentPlanArtifacts,
+  fallback: AgentPlanArtifacts,
+): AgentPlanArtifacts {
+  return {
+    chartMetrics:
+      primary.chartMetrics.length > 0
+        ? primary.chartMetrics
+        : fallback.chartMetrics,
+    projectionMetrics:
+      primary.projectionMetrics.length > 0
+        ? primary.projectionMetrics
+        : fallback.projectionMetrics,
+    funnel: primary.funnel || fallback.funnel,
+    actionPlan: primary.actionPlan || fallback.actionPlan,
+  };
+}
+
+export function computeArtifactsFromText(input: {
+  text: string;
+  workspaceCommand?: AgentWorkspaceCommand;
+}): AgentPlanArtifacts {
+  const markers = extractAgentMarkers(input.text);
+  return resolveAttachFlags({
+    workspaceCommand: input.workspaceCommand,
+    markers,
+    replay: undefined,
+  });
+}
+
 function resolveAttachFlags(input: {
   workspaceCommand?: AgentWorkspaceCommand;
   markers: ReturnType<typeof extractAgentMarkers>;
@@ -160,6 +190,7 @@ export function buildAgentMessageParts(
 
   const parts: AgentMessageParts["parts"] = [];
   const ctx = input.workspaceContext;
+  const attachVisualParts = input.mode !== "plan";
 
   if (skillTurn && ctx && skillTurn.skill.metricKeys.length > 0) {
     const built = buildSkillChartPart({
@@ -179,42 +210,44 @@ export function buildAgentMessageParts(
       content += `\n\n_(Sem série no período: ${labels}.)_`;
     }
   } else if (ctx) {
-    for (const metricKey of artifacts.chartMetrics) {
-      const chart = buildChartPart({
-        metricKey,
-        period: ctx.period,
-        metricDays: ctx.metricDays,
-        sourceStatuses: ctx.sourceStatuses,
-        terminalValue: ctx.snapshotMetricValues[metricKey] ?? null,
-      });
-      if (chart) {
-        parts.push(chart);
+    if (attachVisualParts) {
+      for (const metricKey of artifacts.chartMetrics) {
+        const chart = buildChartPart({
+          metricKey,
+          period: ctx.period,
+          metricDays: ctx.metricDays,
+          sourceStatuses: ctx.sourceStatuses,
+          terminalValue: ctx.snapshotMetricValues[metricKey] ?? null,
+        });
+        if (chart) {
+          parts.push(chart);
+        }
+      }
+
+      for (const metricKey of artifacts.projectionMetrics) {
+        const projection = buildProjectionPart({
+          metricKey,
+          period: ctx.period,
+          metricDays: ctx.metricDays,
+          sourceStatuses: ctx.sourceStatuses,
+        });
+        if (projection) {
+          parts.push(projection);
+        }
+      }
+
+      if (artifacts.funnel) {
+        const funnel = buildFunnelPartFromMeasurement(ctx.measurement);
+        if (funnel) {
+          parts.push(funnel);
+        }
+      }
+
+      if (artifacts.actionPlan) {
+        parts.push(buildActionPlanPartFromNarrative(ctx.narrative));
       }
     }
-
-    for (const metricKey of artifacts.projectionMetrics) {
-      const projection = buildProjectionPart({
-        metricKey,
-        period: ctx.period,
-        metricDays: ctx.metricDays,
-        sourceStatuses: ctx.sourceStatuses,
-      });
-      if (projection) {
-        parts.push(projection);
-      }
-    }
-
-    if (artifacts.funnel) {
-      const funnel = buildFunnelPartFromMeasurement(ctx.measurement);
-      if (funnel) {
-        parts.push(funnel);
-      }
-    }
-
-    if (artifacts.actionPlan) {
-      parts.push(buildActionPlanPartFromNarrative(ctx.narrative));
-    }
-  } else if (artifacts.actionPlan) {
+  } else if (attachVisualParts && artifacts.actionPlan) {
     parts.push(buildActionPlanPartFromNarrative(null));
   }
 

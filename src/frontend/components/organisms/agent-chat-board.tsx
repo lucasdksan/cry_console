@@ -20,6 +20,7 @@ import type {
   AgentSessionPublic,
 } from "@/backend/lib/agent/types";
 import { parseAgentInput } from "@/backend/lib/agent/command";
+import { formatPlanQuestionAnswers } from "@/backend/lib/agent/plan-questions";
 import type { AgentChatMode } from "@/generated/prisma/client";
 import { BrandLogo } from "@/frontend/components/atoms/brand-logo";
 import {
@@ -45,6 +46,10 @@ import {
   generateChromePromptText,
   checkChromePromptReady,
 } from "@/frontend/lib/browser/prompt";
+import {
+  createOptimisticUserMessage,
+  markPlanQuestionsAnsweredInMessages,
+} from "@/frontend/lib/agent/optimistic-messages";
 import { useAgentNavRefresh } from "@/frontend/lib/agent/nav-sync";
 
 type AgentChatBoardProps = {
@@ -83,9 +88,25 @@ export function AgentChatBoard({
   const [skillSlashCatalog, setSkillSlashCatalog] = React.useState<
     UserAgentSkillSlashPublic[]
   >([]);
+  const messagesRollbackRef = React.useRef<AgentMessagePublic[] | null>(null);
 
   const isEmpty = messages.length === 0;
   const showLanding = isEmpty && !session;
+
+  const activePlanQuestionsMessageId = React.useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const message = messages[i];
+      if (message.role !== "assistant") {
+        continue;
+      }
+      const part = message.parts.find((p) => p.type === "plan_questions");
+      if (part?.type === "plan_questions" && !part.answered) {
+        return message.id;
+      }
+      break;
+    }
+    return null;
+  }, [messages]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -159,7 +180,10 @@ export function AgentChatBoard({
     setMessages(completed.messages);
   }
 
-  async function handleSend(text: string) {
+  async function handleSend(
+    text: string,
+    options?: { planQuestionsMessageId?: string | null },
+  ) {
     const parsed = parseAgentInput(text);
     if (parsed.kind === "mode_only") {
       setMode(parsed.mode);
@@ -189,6 +213,17 @@ export function AgentChatBoard({
       return;
     }
 
+    setMessages((prev) => {
+      messagesRollbackRef.current = prev;
+      return [
+        ...markPlanQuestionsAnsweredInMessages(
+          prev,
+          options?.planQuestionsMessageId,
+        ),
+        createOptimisticUserMessage(text),
+      ];
+    });
+
     setBusy(true);
     setThinkingTick(0);
     setOperationError(null);
@@ -204,6 +239,10 @@ export function AgentChatBoard({
       });
 
       if (!result.ok) {
+        if (messagesRollbackRef.current) {
+          setMessages(messagesRollbackRef.current);
+          messagesRollbackRef.current = null;
+        }
         setOperationError({
           message: result.error,
           retryable: result.retryable ?? false,
@@ -212,6 +251,7 @@ export function AgentChatBoard({
         router.refresh();
         return;
       }
+      messagesRollbackRef.current = null;
 
       if (!session && result.sessionId) {
         await refreshAgentNav();
@@ -234,6 +274,10 @@ export function AgentChatBoard({
       await refreshAgentNav();
       router.refresh();
     } catch (error) {
+      if (messagesRollbackRef.current) {
+        setMessages(messagesRollbackRef.current);
+        messagesRollbackRef.current = null;
+      }
       setOperationError({
         message:
           error instanceof Error ? error.message : "Não foi possível enviar.",
@@ -242,6 +286,21 @@ export function AgentChatBoard({
     } finally {
       setBusy(false);
     }
+  }
+
+  function handleSubmitPlanAnswers(answers: Record<string, string>) {
+    const message = messages.find((m) => m.id === activePlanQuestionsMessageId);
+    const part = message?.parts.find((p) => p.type === "plan_questions");
+    if (part?.type !== "plan_questions") {
+      return;
+    }
+    void handleSend(
+      formatPlanQuestionAnswers({
+        questions: part.questions,
+        answers,
+      }),
+      { planQuestionsMessageId: activePlanQuestionsMessageId },
+    );
   }
 
   async function handleApprovePlan(messageId: string) {
@@ -378,6 +437,9 @@ export function AgentChatBoard({
                 message={message}
                 onApprovePlan={handleApprovePlan}
                 approvingPlanId={approvingPlanId}
+                onSubmitPlanAnswers={handleSubmitPlanAnswers}
+                submittingPlanAnswers={busy}
+                activePlanQuestionsMessageId={activePlanQuestionsMessageId}
               />
             ))}
           </div>

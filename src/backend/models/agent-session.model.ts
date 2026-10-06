@@ -159,3 +159,15 @@ export function parseMessageParts(value: unknown): AgentMessageParts["parts"] {
   const parts = (value as { parts?: unknown }).parts;
   return Array.isArray(parts) ? (parts as AgentMessageParts["parts"]) : [];
 }
+
+export async function updateAgentMessageParts(input: {
+  messageId: string;
+  parts: AgentMessageParts;
+}): Promise<void> {
+  await prisma.agentMessage.update({
+    where: { id: input.messageId },
+    data: {
+      partsJson: input.parts as Prisma.InputJsonValue,
+    },
+  });
+}
