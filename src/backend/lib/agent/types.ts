@@ -27,11 +27,15 @@ export type AgentChartPart = {
 export type AgentProjectionPoint = {
   dateYmd: string;
   dailyValue: number | null;
+  /** Previsão do dia (só dias futuros após coleta). */
+  projectedValue: number | null;
   meanLine: number | null;
   bandUpper: number | null;
   bandLower: number | null;
   isFuture: boolean;
 };
+
+export type AgentProjectionForecastMethod = "mean" | "linear_trend";
 
 export type AgentProjectionPart = {
   type: "projection";
@@ -42,6 +46,7 @@ export type AgentProjectionPart = {
   observedTotal: number | null;
   projectedMonthTotal: number | null;
   isRateMetric: boolean;
+  forecastMethod: AgentProjectionForecastMethod;
   outlierDays: { dateYmd: string; value: number }[];
   points: AgentProjectionPoint[];
 };

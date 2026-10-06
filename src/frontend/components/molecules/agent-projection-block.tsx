@@ -45,19 +45,26 @@ function formatMetricValue(value: number, isRate: boolean): string {
 }
 
 export function AgentProjectionBlock({ part }: AgentProjectionBlockProps) {
+  const forecastLabel =
+    part.forecastMethod === "linear_trend"
+      ? "Projeção (tendência)"
+      : "Projeção (média)";
+
   const data = part.points.map((point) => ({
     date: formatDayLabel(point.dateYmd),
     daily: point.dailyValue,
+    projected: point.projectedValue ?? null,
     mean: point.meanLine,
     bandUpper: point.bandUpper,
     bandLower: point.bandLower,
-    projectedMean: point.isFuture ? point.meanLine : null,
+    projectedLine: point.isFuture ? point.projectedValue : null,
   }));
 
   const config = {
-    daily: { label: "Dia", color: "var(--chart-1)" },
-    mean: { label: "Média", color: "var(--chart-2)" },
-    projectedMean: { label: "Projeção (média)", color: "var(--chart-2)" },
+    daily: { label: "Realizado", color: "var(--chart-1)" },
+    projected: { label: forecastLabel, color: "var(--chart-2)" },
+    mean: { label: "Média histórica", color: "var(--chart-3)" },
+    projectedLine: { label: forecastLabel, color: "var(--chart-2)" },
     bandUpper: { label: "Faixa +1σ", color: "var(--muted-foreground)" },
   } satisfies ChartConfig;
 
@@ -116,6 +123,13 @@ export function AgentProjectionBlock({ part }: AgentProjectionBlockProps) {
               radius={[2, 2, 0, 0]}
               isAnimationActive={false}
             />
+            <Bar
+              dataKey="projected"
+              fill="var(--color-projected)"
+              fillOpacity={0.55}
+              radius={[2, 2, 0, 0]}
+              isAnimationActive={false}
+            />
             <Line
               type="monotone"
               dataKey="mean"
@@ -126,12 +140,13 @@ export function AgentProjectionBlock({ part }: AgentProjectionBlockProps) {
             />
             <Line
               type="monotone"
-              dataKey="projectedMean"
-              stroke="var(--color-projectedMean)"
+              dataKey="projectedLine"
+              stroke="var(--color-projectedLine)"
               strokeWidth={2}
               strokeDasharray="6 4"
               dot={false}
               connectNulls={false}
+              legendType="none"
               isAnimationActive={false}
             />
           </ComposedChart>

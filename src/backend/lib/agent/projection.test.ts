@@ -52,6 +52,35 @@ describe("agent-projection", () => {
     const futurePoints = part!.points.filter((p) => p.isFuture);
     expect(futurePoints.length).toBeGreaterThan(0);
     expect(futurePoints.every((p) => p.dailyValue === null)).toBe(true);
+    expect(
+      futurePoints.every(
+        (p) => p.projectedValue !== null && p.projectedValue >= 0,
+      ),
+    ).toBe(true);
+    expect(part!.forecastMethod).toBeDefined();
+  });
+
+  it("projeta tendência acima da média quando série cresce", () => {
+    const days: MetricDayRow[] = [1, 2, 3, 4, 5].map((d) => ({
+      id: String(d),
+      workspaceId: "w",
+      calendarDay: new Date(`2026-10-0${d}T00:00:00.000Z`),
+      collectedAt: new Date(),
+      vtexRevenue: d * 10,
+      vtexOrders: null,
+      ga4Sessions: null,
+      ga4Purchases: null,
+      gscClicks: null,
+    }));
+    const part = buildProjectionPart({
+      metricKey: "vtex_revenue",
+      period,
+      metricDays: days,
+      sourceStatuses: { vtex: "ok", ga4: "missing", gsc: "missing" },
+    });
+    const lastFuture = part!.points.filter((p) => p.isFuture).at(-1);
+    expect(part!.forecastMethod).toBe("linear_trend");
+    expect(lastFuture!.projectedValue!).toBeGreaterThan(part!.mean!);
   });
 
   it("ignora dias com sessão zero na conversão", () => {

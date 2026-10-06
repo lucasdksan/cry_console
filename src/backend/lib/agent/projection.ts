@@ -9,6 +9,7 @@ import type { AgentProjectionPart } from "@/backend/lib/agent/types";
 import { CHART_METRIC_LABELS } from "@/backend/lib/agent/types";
 import { buildMetricDailySeries } from "@/backend/lib/workspace/metric-series";
 import type { MetricDayRow } from "@/backend/models/workspace-metric.model";
+import { forecastDailyValues } from "@/backend/lib/workspace/daily-forecast";
 import {
   enumerateCalendarDaysInclusive,
   ymdFromPeriodIso,
@@ -103,18 +104,41 @@ export function buildProjectionPart(input: {
     ? null
     : observedValues.reduce((a, b) => a + b, 0);
 
-  const futureDayCount = enumerateCalendarDaysInclusive(
-    collectEndYmd,
+  const periodStartYmd = ymdFromPeriodIso(input.period.start);
+  const allYmds = enumerateCalendarDaysInclusive(
+    periodStartYmd,
     monthEndYmd,
-  ).filter((ymd) => ymd > collectEndYmd).length;
+  );
+  const ymdToIndex = new Map(allYmds.map((ymd, index) => [ymd, index]));
+
+  const observedForForecast = daily
+    .filter(
+      (p) =>
+        p.dateYmd <= collectEndYmd &&
+        p.value !== null &&
+        ymdToIndex.has(p.dateYmd),
+    )
+    .map((p) => ({
+      index: ymdToIndex.get(p.dateYmd)!,
+      value: p.value as number,
+    }));
+
+  const futureYmds = allYmds.filter((ymd) => ymd > collectEndYmd);
+  const forecast = forecastDailyValues({
+    observed: observedForForecast,
+    futureIndices: futureYmds.map((ymd) => ymdToIndex.get(ymd)!),
+    isRateMetric,
+  });
+  const projectedByYmd = new Map(
+    futureYmds.map((ymd, i) => [ymd, forecast.values[i]!]),
+  );
 
   let projectedMonthTotal: number | null = null;
-  if (mean !== null) {
-    if (isRateMetric) {
-      projectedMonthTotal = mean;
-    } else if (observedTotal !== null) {
-      projectedMonthTotal = observedTotal + mean * futureDayCount;
-    }
+  if (isRateMetric && mean !== null) {
+    projectedMonthTotal = mean;
+  } else if (observedTotal !== null) {
+    const futureSum = forecast.values.reduce((a, b) => a + b, 0);
+    projectedMonthTotal = observedTotal + futureSum;
   }
 
   const points = daily.map((point) => {
@@ -123,9 +147,13 @@ export function buildProjectionPart(input: {
       mean !== null && stdDev !== null ? mean + stdDev : null;
     const bandLower =
       mean !== null && stdDev !== null ? mean - stdDev : null;
+    const projectedValue = isFuture
+      ? (projectedByYmd.get(point.dateYmd) ?? null)
+      : null;
     return {
       dateYmd: point.dateYmd,
       dailyValue: isFuture ? null : point.value,
+      projectedValue,
       meanLine: mean,
       bandUpper,
       bandLower,
@@ -142,6 +170,7 @@ export function buildProjectionPart(input: {
     observedTotal,
     projectedMonthTotal,
     isRateMetric,
+    forecastMethod: forecast.method,
     outlierDays,
     points,
   };
