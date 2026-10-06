@@ -9,7 +9,9 @@ import {
   AGENT_PRIMARY_CHIPS,
   AGENT_SLASH_CATALOG,
   slashSendText,
+  type AgentSlashCatalogEntry,
 } from "@/backend/lib/agent/command";
+import type { UserAgentSkillSlashPublic } from "@/backend/models/user-agent-skill.model";
 import { AGENT_MODE_META } from "@/backend/lib/agent/types";
 import { Badge } from "@/frontend/components/ui/badge";
 import { Button } from "@/frontend/components/ui/button";
@@ -44,6 +46,7 @@ type AgentComposerProps = {
   thinkingSeconds?: number;
   onQuickCommand?: (text: string) => void;
   onSubmit: (text: string) => void;
+  skillSlashCatalog?: UserAgentSkillSlashPublic[];
 };
 
 function workspaceDisplayName(
@@ -79,6 +82,7 @@ export function AgentComposer({
   thinkingSeconds,
   onQuickCommand,
   onSubmit,
+  skillSlashCatalog = [],
 }: AgentComposerProps) {
   const [text, setText] = React.useState("");
   const [attachments, setAttachments] = React.useState<AgentTextAttachment[]>(
@@ -87,8 +91,21 @@ export function AgentComposer({
   const [attachError, setAttachError] = React.useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  const slashQuery = text.startsWith("/") ? text.toLowerCase() : "";
   const showSlash =
-    text.startsWith("/") && !text.includes("\n") && text.length <= 32;
+    slashQuery.length > 0 &&
+    !text.includes("\n") &&
+    !text.slice(1).includes(" ");
+
+  const slashEntries = React.useMemo((): AgentSlashCatalogEntry[] => {
+    const skillEntries: AgentSlashCatalogEntry[] = skillSlashCatalog.map(
+      (skill) => ({
+        slash: `/${skill.slug}`,
+        hint: skill.name,
+      }),
+    );
+    return [...AGENT_SLASH_CATALOG, ...skillEntries];
+  }, [skillSlashCatalog]);
 
   const selectedModel = modelOptions.find((o) => o.id === modelOptionId);
   const workspaceLabel = workspaceDisplayName(
@@ -155,9 +172,9 @@ export function AgentComposer({
     >
       {showSlash ? (
         <ul className="max-h-40 overflow-y-auto rounded-lg border border-border/60 bg-muted/40 p-2 text-xs">
-          {AGENT_SLASH_CATALOG.filter((c) =>
-            c.slash.startsWith(text.toLowerCase()),
-          ).map((item) => (
+          {slashEntries
+            .filter((c) => c.slash.startsWith(slashQuery))
+            .map((item) => (
             <li key={item.slash} className="px-2 py-1 text-muted-foreground">
               <button
                 type="button"

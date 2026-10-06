@@ -19,6 +19,7 @@ model User {
   sessions          Session[]
   resetTokens       PasswordResetToken[]
   aiProviders       UserAiProvider[]
+  agentSkills       UserAgentSkill[]
   aiUsageLogs       AiUsageLog[]
   agentSessions     AgentSession[]
   workspaces        Workspace[]
@@ -41,6 +42,22 @@ model UserAiProvider {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, providerKey])
+  @@index([userId])
+}
+
+model UserAgentSkill {
+  id          String               @id @default(cuid())
+  userId      String
+  name        String
+  slug        String
+  instruction String               @db.Text
+  metricKeys  WorkspaceMetricKey[]
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, slug])
   @@index([userId])
 }
 
@@ -211,6 +228,9 @@ enum WorkspaceMetricKey {
   ga4_sessions
   ga4_conversion_pct
   gsc_clicks
+  clarity_sessions
+  clarity_dead_clicks
+  clarity_quick_backs
 }
 
 enum WorkspaceMetricSourceStatus {

@@ -86,6 +86,22 @@ export async function findOkClaritySnapshotForUtcDay(
   return row ? rowFromEntity(row) : null;
 }
 
+export async function listOkClaritySnapshotsForRange(
+  workspaceId: string,
+  startDay: Date,
+  endDay: Date,
+): Promise<ClaritySnapshotRow[]> {
+  const rows = await prisma.workspaceClaritySnapshot.findMany({
+    where: {
+      workspaceId,
+      status: "ok",
+      capturedOn: { gte: startDay, lte: endDay },
+    },
+    orderBy: [{ capturedOn: "asc" }, { collectedAt: "asc" }],
+  });
+  return rows.map(rowFromEntity);
+}
+
 export async function findLatestOkClaritySnapshot(
   workspaceId: string,
 ): Promise<ClaritySnapshotRow | null> {

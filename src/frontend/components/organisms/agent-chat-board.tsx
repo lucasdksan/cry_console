@@ -4,6 +4,7 @@ import { Check, Pencil, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 
+import { fetchAgentSkillSlashCatalog } from "@/backend/controllers/agent-skill.controller";
 import {
   approveAgentPlan,
   completeBrowserAgentTurn,
@@ -13,6 +14,7 @@ import {
   sendAgentMessage,
   type AgentModelOption,
 } from "@/backend/controllers/agent.controller";
+import type { UserAgentSkillSlashPublic } from "@/backend/models/user-agent-skill.model";
 import type {
   AgentMessagePublic,
   AgentSessionPublic,
@@ -78,6 +80,9 @@ export function AgentChatBoard({
   const [sessionTitleEditing, setSessionTitleEditing] = React.useState(false);
   const [operationError, setOperationError] =
     React.useState<AgentChatErrorState | null>(null);
+  const [skillSlashCatalog, setSkillSlashCatalog] = React.useState<
+    UserAgentSkillSlashPublic[]
+  >([]);
 
   const isEmpty = messages.length === 0;
   const showLanding = isEmpty && !session;
@@ -86,11 +91,15 @@ export function AgentChatBoard({
     let cancelled = false;
     void (async () => {
       const chromeReady = await checkChromePromptReady();
-      const options = await listAgentModelOptions({ chromeReady });
+      const [options, skills] = await Promise.all([
+        listAgentModelOptions({ chromeReady }),
+        fetchAgentSkillSlashCatalog().catch(() => [] as UserAgentSkillSlashPublic[]),
+      ]);
       if (cancelled) {
         return;
       }
       setModelOptions(options);
+      setSkillSlashCatalog(skills);
       setModelOptionId((prev) =>
         prev && options.some((o) => o.id === prev)
           ? prev
@@ -128,6 +137,7 @@ export function AgentChatBoard({
     thinkingSeconds: displayThinking,
     onQuickCommand: (value: string) => void handleSend(value),
     onSubmit: (value: string) => void handleSend(value),
+    skillSlashCatalog,
   };
 
   async function runBrowserGeneration(input: {
@@ -355,7 +365,7 @@ export function AgentChatBoard({
         </div>
       ) : (
         <>
-          <div className="flex flex-1 flex-col gap-4 px-4 py-4">
+          <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 py-2">
             {operationError ? (
               <AgentChatErrorAlert
                 error={operationError}

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildChartPart,
+  buildSkillChartPart,
   extractChartMarker,
   resolveMetricFromHint,
   resolveChartMetricForCommand,
@@ -56,7 +57,7 @@ describe("agent-chart", () => {
       terminalValue: 42_000,
     });
     expect(part).not.toBeNull();
-    expect(part?.points.at(-1)?.value).toBe(42_000);
+    expect(part?.points?.at(-1)?.value).toBe(42_000);
   });
 
   it("não retorna gráfico quando série só tem zeros", () => {
@@ -81,5 +82,40 @@ describe("agent-chart", () => {
       terminalValue: null,
     });
     expect(part).toBeNull();
+  });
+
+  it("monta gráfico multi-métrica omitindo série vazia", () => {
+    const days: MetricDayRow[] = [
+      {
+        id: "1",
+        workspaceId: "w",
+        calendarDay: new Date("2026-10-01T00:00:00.000Z"),
+        collectedAt: new Date(),
+        vtexRevenue: 100,
+        vtexOrders: null,
+        ga4Sessions: null,
+        ga4Purchases: null,
+        gscClicks: 10,
+      },
+    ];
+    const built = buildSkillChartPart({
+      skillName: "Search x VTEX",
+      metricKeys: ["vtex_revenue", "gsc_clicks", "ga4_sessions"],
+      period,
+      metricDays: days,
+      claritySnapshots: [],
+      sourceStatuses: {
+        vtex: "ok",
+        ga4: "missing",
+        gsc: "ok",
+        clarity: "missing",
+      },
+      snapshotMetricValues: { vtex_revenue: 100, gsc_clicks: 10 },
+    });
+    expect(built.chart?.series).toHaveLength(2);
+    expect(built.missingKeys).toContain("ga4_sessions");
+    expect(built.presentKeys).toEqual(
+      expect.arrayContaining(["vtex_revenue", "gsc_clicks"]),
+    );
   });
 });

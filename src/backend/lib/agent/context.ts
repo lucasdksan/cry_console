@@ -15,6 +15,14 @@ import {
   calendarDayFromYmd,
   ymdFromPeriodIso,
 } from "@/backend/lib/workspace/period";
+import {
+  clarityMetricValueFromSnapshot,
+} from "@/backend/lib/agent/clarity-series";
+import {
+  findLatestOkClaritySnapshot,
+  listOkClaritySnapshotsForRange,
+  type ClaritySnapshotRow,
+} from "@/backend/models/workspace-clarity-snapshot.model";
 import { findLatestMetricSnapshotBeforeDay } from "@/backend/models/workspace-metric.model";
 import type { WorkspaceMetricKey } from "@/generated/prisma/client";
 import { metricValueFromSnapshot } from "@/backend/lib/workspace/alert-metrics";
@@ -32,8 +40,10 @@ export type AgentWorkspaceContext = {
     vtex: "ok" | "failed" | "missing";
     ga4: "ok" | "failed" | "missing";
     gsc: "ok" | "failed" | "missing";
+    clarity: "ok" | "failed" | "missing";
   };
   metricDays: Awaited<ReturnType<typeof listMetricDaysForRange>>;
+  claritySnapshots: ClaritySnapshotRow[];
   period: ReturnType<typeof calendarMonthPeriod>;
 };
 
@@ -65,15 +75,22 @@ export async function loadAgentWorkspaceContext(input: {
   const periodStartDay = calendarDayFromYmd(ymdFromPeriodIso(period.start));
   const periodEndDay = calendarDayFromYmd(ymdFromPeriodIso(period.collectEnd));
 
-  const [analysisRow, metricDays, snapshot] = await Promise.all([
-    findWorkspaceAnalysisByWorkspaceId(input.workspaceId),
-    listMetricDaysForRange(input.workspaceId, periodStartDay, periodEndDay),
-    findLatestMetricSnapshotBeforeDay(
-      input.workspaceId,
-      "month",
-      period.capturedOn,
-    ),
-  ]);
+  const [analysisRow, metricDays, snapshot, claritySnapshots, latestClarity] =
+    await Promise.all([
+      findWorkspaceAnalysisByWorkspaceId(input.workspaceId),
+      listMetricDaysForRange(input.workspaceId, periodStartDay, periodEndDay),
+      findLatestMetricSnapshotBeforeDay(
+        input.workspaceId,
+        "month",
+        period.capturedOn,
+      ),
+      listOkClaritySnapshotsForRange(
+        input.workspaceId,
+        periodStartDay,
+        periodEndDay,
+      ),
+      findLatestOkClaritySnapshot(input.workspaceId),
+    ]);
 
   let measurement: AnalysisMeasurementJson | null = null;
   let narrative: AnalysisNarrativeJson | null = null;
@@ -97,10 +114,16 @@ export async function loadAgentWorkspaceContext(input: {
 
   const metricKeyForChart = resolveMetricKeyForCommand(input.command);
 
+  const clarityStatus =
+    latestClarity?.status ??
+    (claritySnapshots.length > 0 ? claritySnapshots.at(-1)?.status : undefined) ??
+    "missing";
+
   const sourceStatuses = {
     vtex: snapshot?.vtexStatus ?? "missing",
     ga4: snapshot?.ga4Status ?? "missing",
     gsc: snapshot?.gscStatus ?? "missing",
+    clarity: clarityStatus,
   };
 
   const snapshotMetricValues: Partial<Record<WorkspaceMetricKey, number | null>> =
@@ -120,9 +143,23 @@ export async function loadAgentWorkspaceContext(input: {
         ga4_sessions: true,
         ga4_conversion_pct: true,
         gsc_clicks: true,
+        clarity_sessions: true,
+        clarity_dead_clicks: true,
+        clarity_quick_backs: true,
       } satisfies Record<WorkspaceMetricKey, true>,
     ) as WorkspaceMetricKey[]) {
-      snapshotMetricValues[key] = metricValueFromSnapshot(key, snap);
+      if (
+        key === "clarity_sessions" ||
+        key === "clarity_dead_clicks" ||
+        key === "clarity_quick_backs"
+      ) {
+        snapshotMetricValues[key] = clarityMetricValueFromSnapshot(
+          key,
+          latestClarity,
+        );
+      } else {
+        snapshotMetricValues[key] = metricValueFromSnapshot(key, snap);
+      }
     }
   }
 
@@ -137,6 +174,7 @@ export async function loadAgentWorkspaceContext(input: {
     snapshotMetricValues,
     sourceStatuses,
     metricDays,
+    claritySnapshots,
     period,
   };
 }

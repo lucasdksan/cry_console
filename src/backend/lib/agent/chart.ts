@@ -6,8 +6,17 @@ import {
 import type { MetricDayRow } from "@/backend/models/workspace-metric.model";
 import type { WorkspaceCalendarPeriod } from "@/backend/lib/workspace/period";
 import type { AgentWorkspaceCommand } from "@/backend/lib/agent/command";
+import {
+  buildClarityMetricSeries,
+  isClarityWorkspaceMetricKey,
+} from "@/backend/lib/agent/clarity-series";
+import {
+  metricUnitFamily,
+  type AgentSkillUnitFamily,
+} from "@/backend/lib/agent/skill";
+import type { ClaritySnapshotRow } from "@/backend/models/workspace-clarity-snapshot.model";
 import { CHART_METRIC_LABELS } from "@/backend/lib/agent/types";
-import type { AgentChartPart } from "@/backend/lib/agent/types";
+import type { AgentChartPart, AgentChartSeries } from "@/backend/lib/agent/types";
 
 const CHART_MARKER_RE = /\[\[chart:([a-z0-9_]+)\]\]/gi;
 
@@ -161,10 +170,114 @@ export function buildChartPart(input: {
     return null;
   }
 
+  const label = CHART_METRIC_LABELS[input.metricKey];
   return {
     type: "chart",
+    title: label,
     metricKey: input.metricKey,
-    label: CHART_METRIC_LABELS[input.metricKey],
+    label,
     points,
+  };
+}
+
+function axisForUnitFamily(
+  family: AgentSkillUnitFamily,
+  familyAxis: Map<AgentSkillUnitFamily, "left" | "right">,
+): "left" | "right" {
+  return familyAxis.get(family) ?? "left";
+}
+
+function buildFamilyAxisMap(
+  keys: WorkspaceMetricKey[],
+): Map<AgentSkillUnitFamily, "left" | "right"> {
+  const families = [...new Set(keys.map(metricUnitFamily))];
+  const map = new Map<AgentSkillUnitFamily, "left" | "right">();
+  if (families.length <= 1) {
+    for (const family of families) {
+      map.set(family, "left");
+    }
+    return map;
+  }
+  map.set(families[0]!, "left");
+  map.set(families[1]!, "right");
+  return map;
+}
+
+export type SkillChartBuildResult = {
+  chart: AgentChartPart | null;
+  presentKeys: WorkspaceMetricKey[];
+  missingKeys: WorkspaceMetricKey[];
+};
+
+export function buildSkillChartPart(input: {
+  metricKeys: WorkspaceMetricKey[];
+  period: WorkspaceCalendarPeriod;
+  metricDays: MetricDayRow[];
+  claritySnapshots: ClaritySnapshotRow[];
+  sourceStatuses: {
+    vtex: "ok" | "failed" | "missing";
+    ga4: "ok" | "failed" | "missing";
+    gsc: "ok" | "failed" | "missing";
+    clarity: "ok" | "failed" | "missing";
+  };
+  snapshotMetricValues: Partial<Record<WorkspaceMetricKey, number | null>>;
+  skillName: string;
+}): SkillChartBuildResult {
+  if (input.metricKeys.length === 0) {
+    return { chart: null, presentKeys: [], missingKeys: [] };
+  }
+
+  const familyAxis = buildFamilyAxisMap(input.metricKeys);
+  const series: AgentChartSeries[] = [];
+  const presentKeys: WorkspaceMetricKey[] = [];
+  const missingKeys: WorkspaceMetricKey[] = [];
+
+  for (const metricKey of input.metricKeys) {
+    const points = isClarityWorkspaceMetricKey(metricKey)
+      ? buildClarityMetricSeries({
+          metricKey,
+          period: input.period,
+          snapshots: input.claritySnapshots,
+          terminalValue: input.snapshotMetricValues[metricKey] ?? null,
+        })
+      : buildMetricCumulativeSeries({
+          metricKey,
+          period: input.period,
+          days: input.metricDays,
+          sourceStatuses: input.sourceStatuses,
+          terminalValue: input.snapshotMetricValues[metricKey] ?? null,
+        });
+    if (!seriesHasDisplayableValues(points)) {
+      missingKeys.push(metricKey);
+      continue;
+    }
+    presentKeys.push(metricKey);
+    const unit = metricUnitFamily(metricKey);
+    series.push({
+      metricKey,
+      label: CHART_METRIC_LABELS[metricKey],
+      unit,
+      axis: axisForUnitFamily(unit, familyAxis),
+      points,
+    });
+  }
+
+  if (series.length === 0) {
+    return { chart: null, presentKeys, missingKeys: input.metricKeys };
+  }
+
+  const title =
+    series.length === 1
+      ? series[0]!.label
+      : `${input.skillName} — comparativo`;
+
+  return {
+    chart: {
+      type: "chart",
+      title,
+      series,
+    },
+    presentKeys,
+    missingKeys,
   };
 }

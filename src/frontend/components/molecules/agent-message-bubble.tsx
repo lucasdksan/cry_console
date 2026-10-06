@@ -29,70 +29,73 @@ export function AgentMessageBubble({
   const { body, attachmentNames } = isUser
     ? splitUserMessageAttachments(message.content)
     : { body: message.content, attachmentNames: [] };
+  const bodyText = body || (isUser ? message.content : "");
+  const showPlan =
+    !isUser && planPart?.type === "plan_pending" && Boolean(onApprovePlan);
+  const planRepeatsBody =
+    showPlan &&
+    planPart.markdown.trim() === (bodyText || message.content).trim();
 
   return (
     <div
-      className={cn(
-        "flex w-full flex-col gap-2",
-        isUser ? "items-end" : "items-start",
-      )}
+      className={cn("flex w-full", isUser ? "justify-end" : "justify-start")}
     >
       <div
         className={cn(
-          "max-w-[min(100%,42rem)] rounded-2xl px-4 py-3 text-sm leading-relaxed",
-          isUser
-            ? "bg-muted text-foreground"
-            : "bg-transparent text-foreground",
+          "flex min-w-0 flex-col gap-4",
+          isUser ? "max-w-[min(85%,32rem)]" : "w-full",
         )}
       >
-        {attachmentNames.length > 0 ? (
-          <div className="mb-2 flex flex-wrap gap-1">
-            {attachmentNames.map((name) => (
-              <Badge key={name} variant="outline" className="text-xs">
-                {name}
-              </Badge>
-            ))}
-          </div>
-        ) : null}
         {isUser ? (
-          <p className="whitespace-pre-wrap">{body || message.content}</p>
-        ) : (
-          <AgentMarkdown content={body} />
-        )}
-      </div>
-      {!isUser &&
-        message.parts.map((part, index) => {
-          if (part.type === "plan_pending") {
-            return null;
-          }
-          const key = `${part.type}-${index}`;
-          const wrap = (node: ReactNode) => (
-            <div key={key} className="w-full max-w-xl">
-              {node}
-            </div>
-          );
-          switch (part.type) {
-            case "chart":
-              return wrap(<AgentChartBlock part={part} />);
-            case "projection":
-              return wrap(<AgentProjectionBlock part={part} />);
-            case "funnel":
-              return wrap(<AgentFunnelBlock part={part} />);
-            case "action_plan":
-              return wrap(<AgentActionPlanBlock part={part} />);
-            default:
+          <div className="rounded-[1.25rem] bg-secondary px-4 py-2.5 text-[15px] leading-7 text-foreground">
+            {attachmentNames.length > 0 ? (
+              <div className="mb-2 flex flex-wrap gap-1">
+                {attachmentNames.map((name) => (
+                  <Badge key={name} variant="outline" className="text-xs">
+                    {name}
+                  </Badge>
+                ))}
+              </div>
+            ) : null}
+            {bodyText ? (
+              <p className="whitespace-pre-wrap">{bodyText}</p>
+            ) : null}
+          </div>
+        ) : !planRepeatsBody && bodyText ? (
+          <AgentMarkdown content={bodyText} />
+        ) : null}
+        {!isUser &&
+          message.parts.map((part, index) => {
+            if (part.type === "plan_pending") {
               return null;
-          }
-        })}
-      {!isUser && planPart?.type === "plan_pending" && onApprovePlan ? (
-        <div className="w-full max-w-xl">
+            }
+            const key = `${part.type}-${index}`;
+            const wrap = (node: ReactNode) => (
+              <div key={key} className="w-full">
+                {node}
+              </div>
+            );
+            switch (part.type) {
+              case "chart":
+                return wrap(<AgentChartBlock part={part} />);
+              case "projection":
+                return wrap(<AgentProjectionBlock part={part} />);
+              case "funnel":
+                return wrap(<AgentFunnelBlock part={part} />);
+              case "action_plan":
+                return wrap(<AgentActionPlanBlock part={part} />);
+              default:
+                return null;
+            }
+          })}
+        {showPlan && planPart?.type === "plan_pending" && onApprovePlan ? (
           <AgentPlanCard
             part={planPart}
             onApprove={() => onApprovePlan(message.id)}
             approving={approvingPlanId === message.id}
           />
-        </div>
-      ) : null}
+        ) : null}
+      </div>
     </div>
   );
 }

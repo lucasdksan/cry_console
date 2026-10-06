@@ -6,9 +6,12 @@ import {
 } from "@/backend/lib/agent/action-plan-part";
 import {
   buildChartPart,
+  buildSkillChartPart,
   resolveChartMetricForCommand,
   shouldAttachChartFromCommand,
 } from "@/backend/lib/agent/chart";
+import type { ResolvedAgentSkillTurn } from "@/backend/lib/agent/skill";
+import { metricLabelsForKeys } from "@/backend/lib/agent/skill";
 import type { AgentWorkspaceCommand } from "@/backend/lib/agent/command";
 import type { AgentWorkspaceContext } from "@/backend/lib/agent/context";
 import {
@@ -32,6 +35,7 @@ export type BuildAgentPartsInput = {
   workspaceContext: AgentWorkspaceContext | null;
   workspaceCommand?: AgentWorkspaceCommand;
   replayArtifacts?: AgentPlanArtifacts;
+  agentSkillTurn?: ResolvedAgentSkillTurn | null;
 };
 
 export type BuildAgentPartsResult = {
@@ -135,18 +139,46 @@ function appendUnavailableNotes(input: {
 export function buildAgentMessageParts(
   input: BuildAgentPartsInput,
 ): BuildAgentPartsResult {
-  const markers = extractAgentMarkers(input.text);
+  const skillTurn = input.agentSkillTurn ?? null;
+  const markers = skillTurn
+    ? {
+        cleanedText: input.text.trim(),
+        chartMetric: null,
+        projectionMetric: null,
+        funnel: false,
+        actionPlan: false,
+      }
+    : extractAgentMarkers(input.text);
   let content = markers.cleanedText || input.text.trim();
-  const artifacts = resolveAttachFlags({
-    workspaceCommand: input.workspaceCommand,
-    markers,
-    replay: input.replayArtifacts,
-  });
+  const artifacts = skillTurn
+    ? emptyArtifacts()
+    : resolveAttachFlags({
+        workspaceCommand: input.workspaceCommand,
+        markers,
+        replay: input.replayArtifacts,
+      });
 
   const parts: AgentMessageParts["parts"] = [];
   const ctx = input.workspaceContext;
 
-  if (ctx) {
+  if (skillTurn && ctx && skillTurn.skill.metricKeys.length > 0) {
+    const built = buildSkillChartPart({
+      metricKeys: skillTurn.skill.metricKeys,
+      period: ctx.period,
+      metricDays: ctx.metricDays,
+      claritySnapshots: ctx.claritySnapshots,
+      sourceStatuses: ctx.sourceStatuses,
+      snapshotMetricValues: ctx.snapshotMetricValues,
+      skillName: skillTurn.skill.name,
+    });
+    if (built.chart) {
+      parts.push(built.chart);
+    }
+    if (built.missingKeys.length > 0) {
+      const labels = metricLabelsForKeys(built.missingKeys).join(", ");
+      content += `\n\n_(Sem série no período: ${labels}.)_`;
+    }
+  } else if (ctx) {
     for (const metricKey of artifacts.chartMetrics) {
       const chart = buildChartPart({
         metricKey,
@@ -186,13 +218,18 @@ export function buildAgentMessageParts(
     parts.push(buildActionPlanPartFromNarrative(null));
   }
 
-  if (input.mode !== "plan") {
+  if (input.mode !== "plan" && !skillTurn) {
     content = appendUnavailableNotes({
       content,
       workspaceCommand: input.workspaceCommand,
       markers,
       parts,
     });
+  }
+
+  if (skillTurn && !ctx) {
+    content +=
+      "\n\n_(Nenhuma loja vinculada à sessão — não foi possível montar gráfico.)_";
   }
 
   return { content, parts, artifacts };

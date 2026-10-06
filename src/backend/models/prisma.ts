@@ -6,7 +6,7 @@ import { PrismaClient } from "@/generated/prisma/client";
  * Next.js dev keeps `globalThis.prisma` across HMR; an outdated client throws
  * validation errors for fields that exist in the generated client but not in memory.
  */
-const PRISMA_CLIENT_CACHE_KEY = "cry-console-prisma-v6-workspace-clarity-snapshot";
+const PRISMA_CLIENT_CACHE_KEY = "cry-console-prisma-v7-user-agent-skill";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -31,7 +31,8 @@ function isStalePrismaClient(client: PrismaClient | undefined): boolean {
   if (
     !("workspace" in client) ||
     !("workspaceMetricSnapshot" in client) ||
-    !("workspaceClaritySnapshot" in client)
+    !("workspaceClaritySnapshot" in client) ||
+    !("userAgentSkill" in client)
   ) {
     return true;
   }

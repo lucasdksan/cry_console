@@ -9,8 +9,18 @@ import {
   parseAgentInput,
   type AgentWorkspaceCommand,
 } from "@/backend/lib/agent/command";
-import { buildChartPartForWorkspaceCommand } from "@/backend/lib/agent/chart";
+import {
+  buildChartPartForWorkspaceCommand,
+  buildSkillChartPart,
+} from "@/backend/lib/agent/chart";
 import { buildAgentMessageParts } from "@/backend/lib/agent/parts";
+import {
+  buildAgentSkillDigestSection,
+  metricLabelsForKeys,
+  resolveAgentSkillTurn,
+  skillUserMessageForPrompt,
+  type ResolvedAgentSkillTurn,
+} from "@/backend/lib/agent/skill";
 import {
   loadAgentWorkspaceContext,
 } from "@/backend/lib/agent/context";
@@ -58,6 +68,7 @@ import {
   loadUserAiProviderCredentials,
   listUserAiProvidersForRouting,
 } from "@/backend/models/user-ai-provider.model";
+import { listUserAgentSkillsForAgent } from "@/backend/models/user-agent-skill.model";
 import { findWorkspaceForUser } from "@/backend/models/workspace.model";
 import type { AgentChatMode, AgentModelSource } from "@/generated/prisma/client";
 
@@ -430,6 +441,39 @@ export type SendAgentMessageResult =
     }
   | { ok: false; error: string; retryable?: boolean };
 
+function buildAgentSkillPromptMeta(
+  turn: ResolvedAgentSkillTurn,
+  workspaceContext: Awaited<ReturnType<typeof loadAgentWorkspaceContext>> | null,
+): { instruction: string; digest: string } {
+  let presentLabels: string[] = [];
+  let missingLabels: string[] = [];
+  if (workspaceContext && turn.skill.metricKeys.length > 0) {
+    const built = buildSkillChartPart({
+      metricKeys: turn.skill.metricKeys,
+      period: workspaceContext.period,
+      metricDays: workspaceContext.metricDays,
+      claritySnapshots: workspaceContext.claritySnapshots,
+      sourceStatuses: workspaceContext.sourceStatuses,
+      snapshotMetricValues: workspaceContext.snapshotMetricValues,
+      skillName: turn.skill.name,
+    });
+    presentLabels = metricLabelsForKeys(built.presentKeys);
+    missingLabels = metricLabelsForKeys(built.missingKeys);
+  } else if (turn.skill.metricKeys.length > 0) {
+    missingLabels = metricLabelsForKeys(turn.skill.metricKeys);
+  }
+  return {
+    instruction: turn.skill.instruction,
+    digest: buildAgentSkillDigestSection({
+      skillName: turn.skill.name,
+      periodLabel: workspaceContext?.periodLabel ?? null,
+      presentLabels,
+      missingLabels,
+      hasWorkspace: Boolean(workspaceContext),
+    }),
+  };
+}
+
 export async function sendAgentMessage(input: {
   sessionId?: string | null;
   workspaceId?: string | null;
@@ -439,6 +483,8 @@ export async function sendAgentMessage(input: {
   chromeReady?: boolean;
 }): Promise<SendAgentMessageResult> {
   const userId = await requireUserId();
+  const userSkills = await listUserAgentSkillsForAgent(userId);
+  const agentSkillTurn = resolveAgentSkillTurn(input.text, userSkills);
   const parsed = parseAgentInput(input.text);
 
   if (parsed.kind === "mode_only") {
@@ -474,7 +520,8 @@ export async function sendAgentMessage(input: {
 
   if (
     mode === "ask" &&
-    isWorkspaceCommandBlockedInAsk(workspaceCommand)
+    isWorkspaceCommandBlockedInAsk(workspaceCommand) &&
+    !agentSkillTurn
   ) {
     const ensured = await ensureSession({
       userId,
@@ -553,7 +600,7 @@ export async function sendAgentMessage(input: {
     }));
 
   let workspaceContext = null;
-  if (mode !== "ask" && session.workspaceId) {
+  if ((mode !== "ask" || agentSkillTurn) && session.workspaceId) {
     const workspace = await findWorkspaceForUser(userId, session.workspaceId);
     if (workspace) {
       workspaceContext = await loadAgentWorkspaceContext({
@@ -566,17 +613,26 @@ export async function sendAgentMessage(input: {
   }
 
   const knowledge =
-    mode === "ask"
+    mode === "ask" && !agentSkillTurn
       ? defaultAgentKnowledgeRetriever.search(messageText)
       : [];
 
+  const promptUserMessage = agentSkillTurn
+    ? skillUserMessageForPrompt(agentSkillTurn.tail, agentSkillTurn.skill.name)
+    : messageText;
+
+  const agentSkillPrompt = agentSkillTurn
+    ? buildAgentSkillPromptMeta(agentSkillTurn, workspaceContext)
+    : null;
+
   const prompt = buildAgentPrompt({
     mode,
-    userMessage: messageText,
+    userMessage: promptUserMessage,
     workspaceContext,
     workspaceCommand,
     knowledgeChunks: knowledge,
     history,
+    agentSkill: agentSkillPrompt,
   });
 
   if (modelChoice.source === "browser") {
@@ -607,7 +663,7 @@ export async function sendAgentMessage(input: {
       });
       if (chart) {
         const content = [
-          `Tendência de **${chart.label}** (${workspaceContext.periodLabel}).`,
+          `Tendência de **${chart.title ?? chart.label}** (${workspaceContext.periodLabel}).`,
           "Não foi possível gerar o comentário automático; confira o gráfico abaixo.",
           `Detalhe: ${generated.error}`,
         ].join("\n\n");
@@ -637,6 +693,7 @@ export async function sendAgentMessage(input: {
     text: generated.text,
     workspaceContext,
     workspaceCommand,
+    agentSkillTurn,
   });
 
   await appendAgentMessage({
@@ -682,6 +739,7 @@ async function buildAssistantParts(input: {
   workspaceContext: Awaited<ReturnType<typeof loadAgentWorkspaceContext>>;
   workspaceCommand?: AgentWorkspaceCommand;
   replayArtifacts?: import("@/backend/lib/agent/types").AgentPlanArtifacts;
+  agentSkillTurn?: ResolvedAgentSkillTurn | null;
 }) {
   const built = buildAgentMessageParts({
     mode: input.mode,
@@ -689,9 +747,10 @@ async function buildAssistantParts(input: {
     workspaceContext: input.workspaceContext,
     workspaceCommand: input.workspaceCommand,
     replayArtifacts: input.replayArtifacts,
+    agentSkillTurn: input.agentSkillTurn,
   });
 
-  if (input.mode === "plan") {
+  if (input.mode === "plan" && !input.agentSkillTurn) {
     let content = built.content;
     if (!isValidPlanMarkdown(content)) {
       content = `# Plano proposto\n\n${content}`;
@@ -726,8 +785,12 @@ export async function completeBrowserAgentTurn(input: {
     return { ok: false, error: "Sessão não encontrada." };
   }
 
+  const userSkills = await listUserAgentSkillsForAgent(userId);
   const allMessages = await listAgentMessages(session.id);
   const userMessage = allMessages.find((m) => m.id === input.userMessageId);
+  const agentSkillTurn = userMessage
+    ? resolveAgentSkillTurn(userMessage.content, userSkills)
+    : null;
   const parsedUser = userMessage
     ? parseAgentInput(userMessage.content)
     : null;
@@ -746,7 +809,7 @@ export async function completeBrowserAgentTurn(input: {
   }
 
   let workspaceContext = null;
-  if (input.mode !== "ask" && session.workspaceId) {
+  if ((input.mode !== "ask" || agentSkillTurn) && session.workspaceId) {
     const workspace = await findWorkspaceForUser(userId, session.workspaceId);
     if (workspace) {
       workspaceContext = await loadAgentWorkspaceContext({
@@ -764,6 +827,7 @@ export async function completeBrowserAgentTurn(input: {
     workspaceContext,
     workspaceCommand,
     replayArtifacts,
+    agentSkillTurn,
   });
 
   await appendAgentMessage({

@@ -3,11 +3,25 @@ import type { WorkspaceMetricKey } from "@/generated/prisma/client";
 
 import type { Pillar } from "@/backend/lib/analysis/types";
 
-export type AgentChartPart = {
-  type: "chart";
+export type AgentSkillUnitFamily = "currency" | "count" | "percent";
+
+export type AgentChartSeries = {
   metricKey: WorkspaceMetricKey;
   label: string;
+  unit: AgentSkillUnitFamily;
+  axis: "left" | "right";
   points: { dateYmd: string; value: number | null }[];
+};
+
+export type AgentChartPart = {
+  type: "chart";
+  title: string;
+  /** Série única (comandos nativos legados). */
+  metricKey?: WorkspaceMetricKey;
+  label?: string;
+  points?: { dateYmd: string; value: number | null }[];
+  /** Skill e comparativos multi-métrica. */
+  series?: AgentChartSeries[];
 };
 
 export type AgentProjectionPoint = {
@@ -151,4 +165,7 @@ export const CHART_METRIC_LABELS: Record<WorkspaceMetricKey, string> = {
   ga4_sessions: "Sessões GA4",
   ga4_conversion_pct: "Conversão GA4 (%)",
   gsc_clicks: "Cliques GSC",
+  clarity_sessions: "Sessões Clarity",
+  clarity_dead_clicks: "Dead clicks Clarity",
+  clarity_quick_backs: "Quick backs Clarity",
 };

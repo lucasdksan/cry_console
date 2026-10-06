@@ -10,6 +10,9 @@ export const METRIC_VALUE_KIND: Record<WorkspaceMetricKey, MetricValueKind> = {
   ga4_sessions: "accumulator",
   ga4_conversion_pct: "rate",
   gsc_clicks: "accumulator",
+  clarity_sessions: "accumulator",
+  clarity_dead_clicks: "accumulator",
+  clarity_quick_backs: "accumulator",
 };
 
 export function computePaceStatus(input: {

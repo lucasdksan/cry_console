@@ -137,8 +137,30 @@ const PILLAR_ALIASES: Record<string, Pillar> = Object.fromEntries(
   ]),
 ) as Record<string, Pillar>;
 
-function normalizeCommandToken(raw: string): string {
+export function normalizeCommandToken(raw: string): string {
   return raw.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+const RESERVED_SLASH_TOKENS = new Set<string>([
+  ...Object.keys(MODE_ALIASES),
+  "saude",
+  "saúde",
+  "grafico",
+  "gráfico",
+  "projecao",
+  "projeção",
+  "plano",
+  "funil",
+  "alertas",
+  "veredito",
+  "ticket",
+  "busca",
+  ...Object.keys(PILLAR_SLASH),
+]);
+
+export function isReservedAgentSlashToken(token: string): boolean {
+  const normalized = normalizeCommandToken(token);
+  return RESERVED_SLASH_TOKENS.has(normalized);
 }
 
 function parsePillarArg(arg: string | undefined): Pillar | undefined {

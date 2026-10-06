@@ -25,6 +25,9 @@ export function buildAgentSystemInstruction(mode: AgentChatMode): string {
   }
 }
 
+const AGENT_SKILL_TURN_HINT =
+  "Turno de skill: o sistema já anexou o gráfico configurado (se houver séries no período). Não use marcadores [[chart]], [[projection]], [[funnel]] ou [[action_plan]]. Responda seguindo a instrução da skill e os dados da loja.";
+
 export function buildAgentPrompt(input: {
   mode: AgentChatMode;
   userMessage: string;
@@ -33,10 +36,16 @@ export function buildAgentPrompt(input: {
   knowledgeChunks?: AgentKnowledgeChunk[];
   history: { role: "user" | "assistant"; content: string }[];
   approvedPlanMarkdown?: string;
+  agentSkill?: { instruction: string; digest: string } | null;
 }): string {
-  const sections: string[] = [buildAgentSystemInstruction(input.mode)];
+  const skillTurn = input.agentSkill ?? null;
+  let systemInstruction = buildAgentSystemInstruction(input.mode);
+  if (skillTurn) {
+    systemInstruction = `${systemInstruction} ${AGENT_SKILL_TURN_HINT}`;
+  }
+  const sections: string[] = [systemInstruction];
 
-  if (input.mode === "ask") {
+  if (input.mode === "ask" && !skillTurn) {
     sections.push(
       "## Catálogo (fonte única)",
       buildAskPromptSection(
@@ -54,8 +63,19 @@ export function buildAgentPrompt(input: {
         input.workspaceCommand,
       ),
     );
+  } else if (!skillTurn) {
+    sections.push("## Dados da loja\nNenhum workspace vinculado a esta sessão.");
   } else {
     sections.push("## Dados da loja\nNenhum workspace vinculado a esta sessão.");
+  }
+
+  if (skillTurn) {
+    sections.push(
+      "## Skill do usuário",
+      skillTurn.instruction,
+      "## Contexto da skill",
+      skillTurn.digest,
+    );
   }
 
   if (input.approvedPlanMarkdown) {

@@ -1,10 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { Bot, User } from "lucide-react";
+import { Bot, Sparkles, User } from "lucide-react";
 
+import { fetchAccountAgentSkills } from "@/backend/controllers/agent-skill.controller";
 import { fetchAccountAiProviders } from "@/backend/controllers/account-settings.controller";
+import type { UserAgentSkillPublic } from "@/backend/models/user-agent-skill.model";
 import type { UserAiProvidersPublic } from "@/backend/models/user-ai-provider.model";
+import { AccountSettingsSkillsSection } from "@/frontend/components/molecules/account-settings-skills-section";
 import { AccountSettingsAccountSection } from "@/frontend/components/molecules/account-settings-account-section";
 import { AccountSettingsProvidersSection } from "@/frontend/components/molecules/account-settings-providers-section";
 import {
@@ -32,6 +35,8 @@ const EMPTY_PROVIDERS: UserAiProvidersPublic = {
   providers: [],
   availableToAdd: [],
 };
+
+const EMPTY_SKILLS: UserAgentSkillPublic[] = [];
 
 function ProvidersSectionSkeleton() {
   return (
@@ -68,6 +73,10 @@ export function AccountSettingsSessionTrigger({
   const [providersError, setProvidersError] = React.useState<string | null>(
     null,
   );
+  const [skillsData, setSkillsData] =
+    React.useState<UserAgentSkillPublic[]>(EMPTY_SKILLS);
+  const [skillsLoading, setSkillsLoading] = React.useState(false);
+  const [skillsError, setSkillsError] = React.useState<string | null>(null);
   const { isMobile, setOpenMobile } = useSidebar();
 
   const loadProviders = React.useCallback(async () => {
@@ -84,12 +93,25 @@ export function AccountSettingsSessionTrigger({
     }
   }, []);
 
+  const loadSkills = React.useCallback(async () => {
+    setSkillsLoading(true);
+    setSkillsError(null);
+    try {
+      const data = await fetchAccountAgentSkills();
+      setSkillsData(data);
+    } catch {
+      setSkillsError("Não foi possível carregar as skills.");
+    } finally {
+      setSkillsLoading(false);
+    }
+  }, []);
+
   async function openSettings() {
     if (isMobile) {
       setOpenMobile(false);
     }
     setOpen(true);
-    await loadProviders();
+    await Promise.all([loadProviders(), loadSkills()]);
   }
 
   function handleOpenChange(next: boolean) {
@@ -129,6 +151,36 @@ export function AccountSettingsSessionTrigger({
       />
     );
 
+    const skillsContent = skillsLoading ? (
+      <ProvidersSectionSkeleton />
+    ) : skillsError ? (
+      <Card className="border-destructive/30 bg-card/80">
+        <CardHeader>
+          <CardTitle className="font-heading text-base text-destructive">
+            Falha ao carregar
+          </CardTitle>
+          <CardDescription className="text-muted-foreground">
+            {skillsError}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            type="button"
+            variant="outline"
+            className="cursor-pointer"
+            onClick={() => void loadSkills()}
+          >
+            Tentar novamente
+          </Button>
+        </CardContent>
+      </Card>
+    ) : (
+      <AccountSettingsSkillsSection
+        data={skillsData}
+        onSkillsChange={setSkillsData}
+      />
+    );
+
     return [
       {
         id: "account",
@@ -150,15 +202,26 @@ export function AccountSettingsSessionTrigger({
         icon: Bot,
         content: providersContent,
       },
+      {
+        id: "skills",
+        label: "Skills",
+        description: "Workflows /slug no agente com gráficos da loja.",
+        icon: Sparkles,
+        content: skillsContent,
+      },
     ];
   }, [
     email,
     image,
     loadProviders,
+    loadSkills,
     name,
     providersData,
     providersError,
     providersLoading,
+    skillsData,
+    skillsError,
+    skillsLoading,
   ]);
 
   return (
