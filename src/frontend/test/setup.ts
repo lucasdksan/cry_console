@@ -14,8 +14,6 @@ vi.mock("next/image", () => ({
     width,
     height,
     className,
-    priority: _priority,
-    unoptimized: _unoptimized,
     ...rest
   }: {
     src: string;
