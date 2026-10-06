@@ -3,7 +3,7 @@
 import * as React from "react";
 import type { LucideIcon } from "lucide-react";
 
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsMobile } from "@/frontend/hooks/use-mobile";
 import { cn } from "@/frontend/lib/utils";
 import {
   Dialog,
