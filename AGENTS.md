@@ -92,7 +92,8 @@ Matcher atual exclui `api`, assets estáticos e arquivos com extensão.
 
 ## Testes e qualidade
 
-- Testes unitários (Vitest): colocalize `*.test.ts` ao lado do módulo em `src/backend/lib/**` ou `src/frontend/**` (ex.: `navigation/filter-nav.test.ts`); include: `src/**/*.test.ts` — rode `pnpm test`.
+- Testes unitários (Vitest): colocalize `*.test.ts` ao lado do módulo em `src/backend/lib/**` ou `src/frontend/**` (ex.: `navigation/filter-nav.test.ts`); include: `src/**/*.test.{ts,tsx}` — rode `pnpm test`.
+- Componentes React (atoms e acima): colocalize `*.test.tsx` com `/** @vitest-environment jsdom */` no topo; setup em `src/frontend/test/setup.ts` (jest-dom, mock de `next/image`, cleanup após cada teste).
 - E2E (Playwright): `tests/e2e/` — `pnpm test:e2e`.
 - Antes de PR: `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`.
 

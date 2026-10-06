@@ -4,7 +4,8 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.{ts,tsx}"],
+    setupFiles: ["src/frontend/test/setup.ts"],
     clearMocks: true,
   },
   resolve: {
