@@ -81,12 +81,6 @@ export function AccountSettingsSkillCard({
     }
   }, [onSkillsChange, removeState.skills, state.skills]);
 
-  useEffect(() => {
-    if (!slugTouched && name.trim()) {
-      setSlug(suggestSlugFromName(name));
-    }
-  }, [name, slugTouched]);
-
   const metricFieldError = state.fieldErrors?.metricKeys?.[0];
   const slugFieldError = state.fieldErrors?.slug?.[0];
 
@@ -145,7 +139,13 @@ export function AccountSettingsSkillCard({
               id={`${formId}-name`}
               name="name"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                const nextName = e.target.value;
+                setName(nextName);
+                if (!slugTouched) {
+                  setSlug(suggestSlugFromName(nextName));
+                }
+              }}
               placeholder="Search x VTEX"
               maxLength={60}
               required
