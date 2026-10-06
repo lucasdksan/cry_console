@@ -202,8 +202,9 @@ export function AppSidebar({
         (hasChildren ? false : isNavItemActive(pathname, item.href));
     const showChildren = hasChildren && workspaceExpanded(item);
     const showToggleChevron = toggleOnly;
+    const trailingAction = item.trailingAction;
     const showHeaderPlus =
-      toggleOnly && Boolean(item.trailingAction) && !isAgentNav;
+      toggleOnly && trailingAction != null && !isAgentNav;
 
     return (
       <SidebarMenuItem
@@ -232,9 +233,9 @@ export function AppSidebar({
           >
             {Icon ? <Icon /> : null}
             <span className="truncate text-left">{item.label}</span>
-            {showHeaderPlus ? (
+            {showHeaderPlus && trailingAction ? (
               <Link
-                href={item.trailingAction.href}
+                href={trailingAction.href}
                 onClick={(event) => {
                   event.stopPropagation();
                   closeMobileNav();
@@ -243,7 +244,7 @@ export function AppSidebar({
                   sidebarNavTrailingSlotClass,
                   "rounded-md transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                 )}
-                aria-label={item.trailingAction.ariaLabel}
+                aria-label={trailingAction.ariaLabel}
               >
                 <Plus className="size-4" />
               </Link>
