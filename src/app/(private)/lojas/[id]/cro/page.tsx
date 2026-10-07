@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 
 import { auth } from "@/backend/auth";
-import { getWorkspacePageAudit } from "@/backend/controllers/page-audit.controller";
+import { getWorkspacePageAuditSet } from "@/backend/controllers/page-audit.controller";
 import {
   findWorkspaceForUser,
   getUserActiveWorkspaceId,
@@ -30,7 +30,7 @@ export default async function LojaCroPage({ params }: CroPageProps) {
     await setActiveWorkspaceForUser(session.user.id, workspace.id);
   }
 
-  const result = await getWorkspacePageAudit(workspace.id);
+  const result = await getWorkspacePageAuditSet(workspace.id);
   if (!result.ok) {
     notFound();
   }
@@ -40,7 +40,7 @@ export default async function LojaCroPage({ params }: CroPageProps) {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">CRO</h1>
         <p className="text-sm text-muted-foreground">
-          {workspace.name} · conversão heurística e contexto do funil
+          {workspace.name} · eixos M/V/I/F/A por URL e resumo da loja
         </p>
       </div>
       <CroReportBoard
