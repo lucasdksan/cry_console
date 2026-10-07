@@ -85,9 +85,10 @@ model Workspace {
   metricSnapshots WorkspaceMetricSnapshot[]
   metricDays     WorkspaceMetricDay[]
   claritySnapshots WorkspaceClaritySnapshot[]
-  analysis         WorkspaceAnalysis?
-  pageAudit        WorkspacePageAudit?
-  agentSessions    AgentSession[]
+  analysis            WorkspaceAnalysis?
+  pageAudits          WorkspacePageAudit[]
+  seoChecklistItems   WorkspaceSeoChecklistItem[]
+  agentSessions       AgentSession[]
 
   @@unique([userId, nameKey])
   @@index([userId])
@@ -181,9 +182,23 @@ model WorkspaceAnalysis {
   @@index([workspaceId])
 }
 
+enum PageAuditRole {
+  home
+  category
+  product
+  search
+}
+
+enum SeoChecklistItemStatus {
+  pending
+  done
+  not_applicable
+}
+
 model WorkspacePageAudit {
   id            String                  @id @default(cuid())
-  workspaceId   String                  @unique
+  workspaceId   String
+  role          PageAuditRole
   url           String
   reportJson    Json
   narrativeJson Json?
@@ -197,6 +212,21 @@ model WorkspacePageAudit {
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
+  @@unique([workspaceId, role])
+  @@index([workspaceId])
+}
+
+model WorkspaceSeoChecklistItem {
+  id          String                 @id @default(cuid())
+  workspaceId String
+  itemKey     String
+  status      SeoChecklistItemStatus @default(pending)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, itemKey])
   @@index([workspaceId])
 }
 
