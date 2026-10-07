@@ -1,4 +1,8 @@
 import {
+  assertSentryTokenCanManageProjects,
+  messageForSentryApiFailure,
+} from "@/backend/lib/sentry/api-error";
+import {
   parseSentryServerConfig,
   sentryProjectSlugForWorkspace,
 } from "@/backend/lib/sentry/config";
@@ -53,7 +57,7 @@ async function sentryFetch<T>(
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     throw new SentryApiError(
-      text || `Sentry HTTP ${response.status}`,
+      messageForSentryApiFailure(response.status, text, authToken),
       response.status,
       path,
     );
@@ -85,7 +89,8 @@ export async function createJavascriptProjectForWorkspace(
   workspaceId: string,
   workspaceName: string,
 ): Promise<SentryProjectRecord> {
-  const { orgSlug, teamSlug } = parseSentryServerConfig();
+  const { orgSlug, teamSlug, authToken } = parseSentryServerConfig();
+  assertSentryTokenCanManageProjects(authToken);
   const slug = sentryProjectSlugForWorkspace(workspaceId);
 
   let project: SentryProjectResponse;
@@ -141,7 +146,8 @@ export async function createJavascriptProjectForWorkspace(
 }
 
 export async function deleteSentryProject(projectSlug: string): Promise<void> {
-  const { orgSlug } = parseSentryServerConfig();
+  const { orgSlug, authToken } = parseSentryServerConfig();
+  assertSentryTokenCanManageProjects(authToken);
   await sentryFetch<void>(`/projects/${orgSlug}/${projectSlug}/`, {
     method: "DELETE",
   });
