@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 
 import {
   getWorkspacePageAuditSet,
@@ -50,11 +50,9 @@ export function SeoReportBoard({ workspaceId, siteUrl, initial }: SeoReportBoard
     return firstMeasured ?? "home";
   });
 
-  useEffect(() => {
-    if (!tabValues.includes(activeTab)) {
-      setActiveTab(tabValues[0] ?? "home");
-    }
-  }, [activeTab, tabValues]);
+  const resolvedTab = tabValues.includes(activeTab)
+    ? activeTab
+    : (tabValues[0] ?? "home");
 
   const refresh = useCallback(async () => {
     const loaded = await getWorkspacePageAuditSet(workspaceId);
@@ -157,7 +155,7 @@ export function SeoReportBoard({ workspaceId, siteUrl, initial }: SeoReportBoard
 
       <PageAuditSetSummary summary={data.summary} measuredCount={measuredCount} />
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={resolvedTab} onValueChange={setActiveTab}>
         <TabsList className="flex h-auto w-full flex-wrap gap-1">
           {data.roles.map((role) => (
             <TabsTrigger key={role.role} value={role.role}>
