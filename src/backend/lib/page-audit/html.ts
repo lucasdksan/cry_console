@@ -1,5 +1,6 @@
 import { parse } from "node-html-parser";
 
+import { extractJsonLdTypes } from "@/backend/lib/page-audit/json-ld";
 import type { HtmlHeading, HtmlSignals } from "@/backend/lib/page-audit/types";
 
 const CTA_PATTERN =
@@ -15,8 +16,10 @@ export function parseHtmlSignals(html: string): Omit<HtmlSignals, "originChecks"
   const description =
     root.querySelector('meta[name="description"]')?.getAttribute("content")?.trim() ||
     null;
+  const canonicalNodes = root.querySelectorAll('link[rel="canonical"]');
+  const canonicalCount = canonicalNodes.length;
   const canonical =
-    root.querySelector('link[rel="canonical"]')?.getAttribute("href")?.trim() || null;
+    canonicalNodes[0]?.getAttribute("href")?.trim() || null;
   const robots =
     root.querySelector('meta[name="robots"]')?.getAttribute("content")?.trim() || null;
   const lang = root.querySelector("html")?.getAttribute("lang")?.trim() || null;
@@ -50,26 +53,61 @@ export function parseHtmlSignals(html: string): Omit<HtmlSignals, "originChecks"
   }
 
   let hasPurchaseCta = false;
-  for (const el of root.querySelectorAll("a, button")) {
+  let anchorLinkCount = 0;
+  let paginationLinkCount = 0;
+  for (const el of root.querySelectorAll("a[href]")) {
+    const href = el.getAttribute("href")?.trim() ?? "";
+    if (href.length > 0) {
+      anchorLinkCount += 1;
+      const lowerHref = href.toLowerCase();
+      if (
+        lowerHref.includes("page=") ||
+        lowerHref.includes("?p=") ||
+        el.getAttribute("rel")?.toLowerCase().includes("next") ||
+        el.getAttribute("rel")?.toLowerCase().includes("prev")
+      ) {
+        paginationLinkCount += 1;
+      }
+    }
     const text = el.text.replace(/\s+/g, " ").trim();
     if (text.length >= 3 && CTA_PATTERN.test(text)) {
       hasPurchaseCta = true;
-      break;
     }
   }
+  if (!hasPurchaseCta) {
+    for (const el of root.querySelectorAll("button")) {
+      const text = el.text.replace(/\s+/g, " ").trim();
+      if (text.length >= 3 && CTA_PATTERN.test(text)) {
+        hasPurchaseCta = true;
+        break;
+      }
+    }
+  }
+
+  const breadcrumbCandidates = root.querySelectorAll(
+    '[class*="breadcrumb" i], nav[aria-label*="breadcrumb" i], [data-testid*="breadcrumb" i], ol[class*="bread" i]',
+  );
+  const hasVisibleBreadcrumb = breadcrumbCandidates.length > 0;
+
+  const jsonLdTypes = extractJsonLdTypes(jsonLdBlocks);
 
   return {
     title,
     description,
     canonical,
+    canonicalCount,
     robots,
     lang,
     viewport,
     headings,
     jsonLdBlocks,
+    jsonLdTypes,
     imagesWithoutAlt,
     imagesSampled: images.length,
     hasPurchaseCta,
+    anchorLinkCount,
+    paginationLinkCount,
+    hasVisibleBreadcrumb,
   };
 }
 

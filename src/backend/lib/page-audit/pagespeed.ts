@@ -40,16 +40,19 @@ export type FetchPageSpeedResult =
   | { ok: true; signals: PageSpeedSignals }
   | { ok: false; error: string };
 
-export async function fetchPageSpeedMobile(
+export type PageSpeedStrategy = "mobile" | "desktop";
+
+export async function fetchPageSpeed(
   url: string,
-  options?: { apiKey?: string; timeoutMs?: number },
+  options?: { apiKey?: string; timeoutMs?: number; strategy?: PageSpeedStrategy },
 ): Promise<FetchPageSpeedResult> {
   const apiKey = options?.apiKey ?? process.env.PAGESPEED_API_KEY ?? "";
   const timeoutMs = options?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const strategy = options?.strategy ?? "mobile";
 
   const params = new URLSearchParams({
     url,
-    strategy: "mobile",
+    strategy,
     category: "performance",
   });
   if (apiKey.trim()) {
@@ -116,4 +119,18 @@ export async function fetchPageSpeedMobile(
   } finally {
     clearTimeout(timer);
   }
+}
+
+export async function fetchPageSpeedMobile(
+  url: string,
+  options?: { apiKey?: string; timeoutMs?: number },
+): Promise<FetchPageSpeedResult> {
+  return fetchPageSpeed(url, { ...options, strategy: "mobile" });
+}
+
+export async function fetchPageSpeedDesktop(
+  url: string,
+  options?: { apiKey?: string; timeoutMs?: number },
+): Promise<FetchPageSpeedResult> {
+  return fetchPageSpeed(url, { ...options, strategy: "desktop" });
 }

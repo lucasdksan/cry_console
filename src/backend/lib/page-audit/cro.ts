@@ -1,9 +1,13 @@
 import { robotsNoindex } from "@/backend/lib/page-audit/html";
+import {
+  averagePerformanceScore,
+  crossDevicePerformanceGap,
+} from "@/backend/lib/page-audit/pagespeed-normalize";
 import type {
   CroHeuristicBlock,
   CroJourneyStep,
   HtmlSignals,
-  PageSpeedSignals,
+  PageSpeedPair,
   SeoAuditBlock,
   StoreContextBlock,
 } from "@/backend/lib/page-audit/types";
@@ -51,9 +55,10 @@ function motivation01(html: HtmlSignals | null): number {
   return clamp01(m);
 }
 
-function perf01(pagespeed: PageSpeedSignals | null): number {
-  if (pagespeed?.performanceScore == null) return 0.5;
-  return clamp01(pagespeed.performanceScore / 100);
+function perf01(pagespeed: PageSpeedPair): number {
+  const avg = averagePerformanceScore(pagespeed);
+  if (avg == null) return 0.5;
+  return clamp01(avg / 100);
 }
 
 function buildJourney(input: {
@@ -98,14 +103,19 @@ function buildDiagnosticFlags(input: {
   f: number;
   v: number;
   a: number;
+  m: number;
   seoAudit: SeoAuditBlock;
   storeContext: StoreContextBlock | null;
+  pagespeed: PageSpeedPair;
 }): string[] {
   const flags: string[] = [];
-  if (input.f >= 0.65) flags.push("friction_high");
-  if (input.v <= 0.45) flags.push("value_low");
-  if (input.a >= 0.55) flags.push("anxiety_high");
+  if (input.f >= 0.65) flags.push("HIGH_FRICTION");
+  if (input.v <= 0.45) flags.push("LOW_VALUE");
+  if (input.a >= 0.55) flags.push("HIGH_ANXIETY");
+  if (input.m <= 0.4) flags.push("LOW_MOTIVATION");
   if (input.seoAudit.summary.high > 0) flags.push("seo_critical");
+  const gap = crossDevicePerformanceGap(input.pagespeed);
+  if (gap != null && gap >= 20) flags.push("MOBILE_DESKTOP_GAP");
   if (
     input.storeContext?.funnelCheckoutToPurchasePct != null &&
     input.storeContext.funnelCheckoutToPurchasePct < 30
@@ -157,7 +167,7 @@ function buildLaymanSummary(input: {
 
 export function buildCroHeuristics(input: {
   html: HtmlSignals | null;
-  pagespeed: PageSpeedSignals | null;
+  pagespeed: PageSpeedPair;
   seoAudit: SeoAuditBlock;
   storeContext: StoreContextBlock | null;
 }): CroHeuristicBlock {
@@ -213,8 +223,10 @@ export function buildCroHeuristics(input: {
     f,
     v,
     a,
+    m,
     seoAudit: input.seoAudit,
     storeContext: input.storeContext,
+    pagespeed: input.pagespeed,
   });
 
   const laymanSummary = buildLaymanSummary({

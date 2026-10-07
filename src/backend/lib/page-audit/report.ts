@@ -1,21 +1,23 @@
 import { buildCroHeuristics } from "@/backend/lib/page-audit/cro";
 import { buildSeoAudit } from "@/backend/lib/page-audit/heuristics";
 import { buildStoreContextFromMeasurement } from "@/backend/lib/page-audit/store-context";
+import type { PageAuditRoleId } from "@/backend/lib/page-audit/roles";
 import type {
   HtmlSignals,
   PageAuditReportJson,
   PageAuditSources,
-  PageSpeedSignals,
+  PageSpeedPair,
 } from "@/backend/lib/page-audit/types";
 import { PAGE_AUDIT_DISCLAIMER } from "@/backend/lib/page-audit/types";
 import type { AnalysisMeasurementJson } from "@/backend/lib/analysis/types";
 
 export function buildPageAuditReport(input: {
   url: string;
+  role: PageAuditRoleId;
   collectedAt: Date;
   sources: PageAuditSources;
   html: HtmlSignals | null;
-  pagespeed: PageSpeedSignals | null;
+  pagespeed: PageSpeedPair;
   measurement: AnalysisMeasurementJson | null;
 }): PageAuditReportJson {
   const storeContext = buildStoreContextFromMeasurement(input.measurement);
@@ -23,6 +25,7 @@ export function buildPageAuditReport(input: {
     html: input.html,
     pagespeed: input.pagespeed,
     storeContext,
+    role: input.role,
   });
   const cro = buildCroHeuristics({
     html: input.html,
@@ -33,6 +36,7 @@ export function buildPageAuditReport(input: {
 
   return {
     url: input.url,
+    role: input.role,
     collectedAt: input.collectedAt.toISOString(),
     sources: input.sources,
     html: input.html,

@@ -7,14 +7,19 @@ const html: HtmlSignals = {
   title: null,
   description: null,
   canonical: null,
+  canonicalCount: 0,
   robots: null,
   lang: null,
   viewport: false,
   headings: [],
   jsonLdBlocks: [],
+  jsonLdTypes: [],
   imagesWithoutAlt: 0,
   imagesSampled: 0,
   hasPurchaseCta: false,
+  anchorLinkCount: 0,
+  paginationLinkCount: 0,
+  hasVisibleBreadcrumb: false,
   originChecks: null,
 };
 
@@ -30,7 +35,12 @@ const pagespeed: PageSpeedSignals = {
 
 describe("buildSeoAudit", () => {
   it("marca title ausente e performance baixa", () => {
-    const audit = buildSeoAudit({ html, pagespeed, storeContext: null });
+    const audit = buildSeoAudit({
+      html,
+      pagespeed: { mobile: pagespeed, desktop: null },
+      storeContext: null,
+      role: "home",
+    });
     expect(audit.findings.some((f) => f.id === "MISSING_TITLE")).toBe(true);
     expect(audit.findings.some((f) => f.id === "LOW_PERFORMANCE")).toBe(true);
     expect(audit.healthScore).not.toBeNull();

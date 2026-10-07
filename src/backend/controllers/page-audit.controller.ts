@@ -6,20 +6,22 @@ import { z } from "zod";
 
 import { auth } from "@/backend/auth";
 import { parseMeasurementJson } from "@/backend/lib/analysis/dto";
+import { buildRoleAuditPlan } from "@/backend/lib/page-audit/audit-paths";
+import { isValidChecklistItemKey } from "@/backend/lib/page-audit/checklist";
 import { isPageAuditFresh } from "@/backend/lib/page-audit/cache";
-import { buildWorkspacePageAuditDto } from "@/backend/lib/page-audit/dto";
+import { buildWorkspacePageAuditSetDto } from "@/backend/lib/page-audit/dto";
 import { fetchPageHtmlSignals } from "@/backend/lib/page-audit/fetch-resources";
 import {
   generatePageAuditNarrative,
   resolvePageAuditLlmRoute,
 } from "@/backend/lib/page-audit/narrative";
-import { fetchPageSpeedMobile } from "@/backend/lib/page-audit/pagespeed";
+import { fetchPageSpeedDesktop, fetchPageSpeedMobile } from "@/backend/lib/page-audit/pagespeed";
 import {
   buildPageAuditReport,
   hasPartialCollectSuccess,
 } from "@/backend/lib/page-audit/report";
-import type { PageAuditSources, WorkspacePageAuditDTO } from "@/backend/lib/page-audit/types";
-import { resolveAuditUrl } from "@/backend/lib/page-audit/url";
+import type { PageAuditPathsInput, PageAuditSources, WorkspacePageAuditSetDTO } from "@/backend/lib/page-audit/types";
+import type { PageAuditRoleId } from "@/backend/lib/page-audit/roles";
 import {
   isPlatformGeminiConfigured,
   readPlatformGeminiConfig,
@@ -30,27 +32,47 @@ import {
   findWorkspaceAnalysisByWorkspaceId,
 } from "@/backend/models/workspace-analysis.model";
 import {
-  findWorkspacePageAuditByWorkspaceId,
+  findWorkspacePageAuditByWorkspaceAndRole,
+  listWorkspacePageAuditsByWorkspaceId,
   upsertWorkspacePageAudit,
 } from "@/backend/models/page-audit.model";
+import {
+  listWorkspaceSeoChecklistItems,
+  upsertWorkspaceSeoChecklistItem,
+} from "@/backend/models/seo-checklist.model";
 import { findWorkspaceForUser } from "@/backend/models/workspace.model";
 import {
   listUserAiProvidersForRouting,
   loadUserAiProviderCredentials,
 } from "@/backend/models/user-ai-provider.model";
+import type { PageAuditRole, SeoChecklistItemStatus } from "@/generated/prisma/client";
 
-const runPageAuditSchema = z.object({
-  path: z.string().max(500).optional(),
+const pathsSchema = z.object({
+  home: z.string().max(500).optional(),
+  category: z.string().max(500).optional(),
+  product: z.string().max(500).optional(),
+  search: z.string().max(500).optional(),
+});
+
+const runPageAuditSetSchema = z.object({
+  paths: pathsSchema.optional(),
   force: z.boolean().optional(),
 });
 
-export type PageAuditActionResult =
-  | { ok: true; data: WorkspacePageAuditDTO }
+const updateChecklistSchema = z.object({
+  itemKey: z.string().min(1).max(120),
+  status: z.enum(["pending", "done", "not_applicable"]),
+});
+
+export type PageAuditSetActionResult =
+  | { ok: true; data: WorkspacePageAuditSetDTO }
   | { ok: false; error: string };
 
-export type PageAuditLoadResult =
-  | { ok: true; data: WorkspacePageAuditDTO | null }
+export type PageAuditSetLoadResult =
+  | { ok: true; data: WorkspacePageAuditSetDTO }
   | { ok: false; error: string };
+
+export type ChecklistUpdateResult = { ok: true } | { ok: false; error: string };
 
 async function requireUserId(): Promise<string> {
   const session = await auth();
@@ -72,68 +94,71 @@ function toRouteInput(
   }));
 }
 
-function buildDto(input: {
+async function loadSetDto(input: {
   workspaceId: string;
   workspaceName: string;
   siteUrl: string;
-  row: Awaited<ReturnType<typeof findWorkspacePageAuditByWorkspaceId>>;
-  requestedUrl: string;
+  requestedUrlsByRole: Partial<Record<string, string>>;
   force: boolean;
-  narrativeError?: string;
-}): WorkspacePageAuditDTO | null {
-  return buildWorkspacePageAuditDto({
+  narrativeErrors?: Partial<Record<string, string>>;
+}): Promise<WorkspacePageAuditSetDTO> {
+  const [rows, checklistRows] = await Promise.all([
+    listWorkspacePageAuditsByWorkspaceId(input.workspaceId),
+    listWorkspaceSeoChecklistItems(input.workspaceId),
+  ]);
+
+  return buildWorkspacePageAuditSetDto({
     workspaceId: input.workspaceId,
     workspaceName: input.workspaceName,
     siteUrl: input.siteUrl,
-    row: input.row,
-    requestedUrl: input.requestedUrl,
+    rows,
+    checklistRows,
+    requestedUrlsByRole: input.requestedUrlsByRole,
     force: input.force,
-    narrativeError: input.narrativeError,
+    narrativeErrors: input.narrativeErrors,
   });
 }
 
-async function runCollectAndPersist(input: {
+async function runCollectAndPersistRole(input: {
   userId: string;
   workspaceId: string;
-  workspaceName: string;
-  siteUrl: string;
+  role: PageAuditRole;
   auditUrl: string;
-}): Promise<PageAuditActionResult> {
-  const [htmlResult, psResult] = await Promise.all([
+}): Promise<{ ok: true } | { ok: false; error: string; keptPrevious: boolean }> {
+  const [htmlResult, psMobile, psDesktop] = await Promise.all([
     fetchPageHtmlSignals(input.auditUrl),
     fetchPageSpeedMobile(input.auditUrl),
+    fetchPageSpeedDesktop(input.auditUrl),
   ]);
+
+  const pagespeed = {
+    mobile: psMobile.ok ? psMobile.signals : null,
+    desktop: psDesktop.ok ? psDesktop.signals : null,
+  };
 
   const sources: PageAuditSources = {
     html: htmlResult.ok
       ? { status: "ok" }
       : { status: "failed", error: htmlResult.error },
-    pagespeed: psResult.ok
-      ? { status: "ok" }
-      : { status: "failed", error: psResult.error },
+    pagespeed:
+      psMobile.ok || psDesktop.ok
+        ? { status: "ok" }
+        : {
+            status: "failed",
+            error: psMobile.ok ? psDesktop.error : psMobile.error,
+          },
     store: { status: "missing" },
   };
 
   if (!hasPartialCollectSuccess(sources)) {
-    const existing = await findWorkspacePageAuditByWorkspaceId(input.workspaceId);
-    if (existing) {
-      const dto = buildDto({
-        workspaceId: input.workspaceId,
-        workspaceName: input.workspaceName,
-        siteUrl: input.siteUrl,
-        row: existing,
-        requestedUrl: input.auditUrl,
-        force: true,
-        narrativeError:
-          "Coleta falhou (HTML e PageSpeed indisponíveis). Relatório anterior mantido.",
-      });
-      if (dto) {
-        return { ok: true, data: dto };
-      }
-    }
+    const existing = await findWorkspacePageAuditByWorkspaceAndRole(
+      input.workspaceId,
+      input.role,
+    );
     return {
       ok: false,
       error: "Não foi possível coletar HTML nem PageSpeed para esta URL.",
+      keptPrevious: Boolean(existing),
     };
   }
 
@@ -151,10 +176,11 @@ async function runCollectAndPersist(input: {
   const collectedAt = new Date();
   const report = buildPageAuditReport({
     url: input.auditUrl,
+    role: input.role as PageAuditRoleId,
     collectedAt,
     sources,
     html: htmlResult.ok ? htmlResult.signals : null,
-    pagespeed: psResult.ok ? psResult.signals : null,
+    pagespeed,
     measurement,
   });
 
@@ -207,8 +233,9 @@ async function runCollectAndPersist(input: {
     });
   }
 
-  const row = await upsertWorkspacePageAudit({
+  await upsertWorkspacePageAudit({
     workspaceId: input.workspaceId,
+    role: input.role,
     url: input.auditUrl,
     reportJson: report,
     narrativeJson: llmResult.ok ? llmResult.narrative : null,
@@ -219,56 +246,46 @@ async function runCollectAndPersist(input: {
     collectedAt,
   });
 
-  revalidatePath(`/lojas/${input.workspaceId}/seo`);
-  revalidatePath(`/lojas/${input.workspaceId}/cro`);
-
-  const dto = buildDto({
-    workspaceId: input.workspaceId,
-    workspaceName: input.workspaceName,
-    siteUrl: input.siteUrl,
-    row,
-    requestedUrl: input.auditUrl,
-    force: true,
-    narrativeError: llmResult.ok ? undefined : llmResult.error,
-  });
-
-  if (!dto) {
-    return { ok: false, error: "Falha ao montar relatório." };
-  }
-
-  return { ok: true, data: dto };
+  return { ok: true };
 }
 
-export async function getWorkspacePageAudit(
+export async function getWorkspacePageAuditSet(
   workspaceId: string,
-): Promise<PageAuditLoadResult> {
+): Promise<PageAuditSetLoadResult> {
   const userId = await requireUserId();
   const workspace = await findWorkspaceForUser(userId, workspaceId);
   if (!workspace) {
     return { ok: false, error: "Loja não encontrada." };
   }
 
-  const row = await findWorkspacePageAuditByWorkspaceId(workspaceId);
-  const requestedUrl = row?.url ?? resolveAuditUrl(workspace.siteUrl);
+  const rows = await listWorkspacePageAuditsByWorkspaceId(workspaceId);
+  const requestedUrlsByRole: Partial<Record<string, string>> = {};
+  for (const row of rows) {
+    requestedUrlsByRole[row.role] = row.url;
+  }
 
   return {
     ok: true,
-    data: buildDto({
+    data: await loadSetDto({
       workspaceId,
       workspaceName: workspace.name,
       siteUrl: workspace.siteUrl,
-      row,
-      requestedUrl,
+      requestedUrlsByRole,
       force: false,
     }),
   };
 }
 
-export async function runWorkspacePageAudit(
+/** @deprecated Use getWorkspacePageAuditSet */
+export async function getWorkspacePageAudit(workspaceId: string) {
+  return getWorkspacePageAuditSet(workspaceId);
+}
+
+export async function runWorkspacePageAuditSet(
   workspaceId: string,
-  raw?: { path?: string; force?: boolean },
-): Promise<PageAuditActionResult> {
-  const parsed = runPageAuditSchema.safeParse(raw ?? {});
+  raw?: { paths?: PageAuditPathsInput; force?: boolean },
+): Promise<PageAuditSetActionResult> {
+  const parsed = runPageAuditSetSchema.safeParse(raw ?? {});
   if (!parsed.success) {
     return { ok: false, error: "Parâmetros inválidos." };
   }
@@ -279,45 +296,110 @@ export async function runWorkspacePageAudit(
     return { ok: false, error: "Loja não encontrada." };
   }
 
-  let auditUrl: string;
+  let plan;
   try {
-    auditUrl = resolveAuditUrl(workspace.siteUrl, parsed.data.path);
+    plan = buildRoleAuditPlan(workspace.siteUrl, parsed.data.paths ?? {});
   } catch (err) {
     const message = err instanceof Error ? err.message : "URL inválida.";
     return { ok: false, error: message };
   }
 
   const force = parsed.data.force ?? false;
-  const existing = await findWorkspacePageAuditByWorkspaceId(workspaceId);
+  const narrativeErrors: Partial<Record<string, string>> = {};
+  let anySuccess = false;
+  let lastError: string | null = null;
 
-  if (
-    existing &&
-    isPageAuditFresh({
-      collectedAt: existing.collectedAt,
-      storedUrl: existing.url,
-      requestedUrl: auditUrl,
-      force,
-    })
-  ) {
-    const dto = buildDto({
+  for (const item of plan) {
+    const existing = await findWorkspacePageAuditByWorkspaceAndRole(workspaceId, item.role);
+    if (
+      existing &&
+      isPageAuditFresh({
+        collectedAt: existing.collectedAt,
+        storedUrl: existing.url,
+        requestedUrl: item.auditUrl,
+        force,
+      })
+    ) {
+      anySuccess = true;
+      continue;
+    }
+
+    const result = await runCollectAndPersistRole({
+      userId,
+      workspaceId,
+      role: item.role,
+      auditUrl: item.auditUrl,
+    });
+
+    if (result.ok) {
+      anySuccess = true;
+    } else {
+      lastError = result.error;
+      if (result.keptPrevious) {
+        narrativeErrors[item.role] = `${result.error} Relatório anterior mantido.`;
+      }
+    }
+  }
+
+  revalidatePath(`/lojas/${workspaceId}/seo`);
+  revalidatePath(`/lojas/${workspaceId}/cro`);
+
+  const requestedUrlsByRole = Object.fromEntries(plan.map((p) => [p.role, p.auditUrl]));
+
+  if (!anySuccess && lastError) {
+    return { ok: false, error: lastError };
+  }
+
+  return {
+    ok: true,
+    data: await loadSetDto({
       workspaceId,
       workspaceName: workspace.name,
       siteUrl: workspace.siteUrl,
-      row: existing,
-      requestedUrl: auditUrl,
-      force: false,
-    });
-    if (!dto) {
-      return { ok: false, error: "Falha ao carregar relatório." };
-    }
-    return { ok: true, data: dto };
+      requestedUrlsByRole,
+      force: true,
+      narrativeErrors,
+    }),
+  };
+}
+
+/** @deprecated Use runWorkspacePageAuditSet */
+export async function runWorkspacePageAudit(
+  workspaceId: string,
+  raw?: { path?: string; force?: boolean },
+) {
+  return runWorkspacePageAuditSet(workspaceId, {
+    force: raw?.force,
+    paths: raw?.path ? { home: raw.path } : undefined,
+  });
+}
+
+export async function updateSeoChecklistItem(
+  workspaceId: string,
+  raw: { itemKey: string; status: SeoChecklistItemStatus },
+): Promise<ChecklistUpdateResult> {
+  const parsed = updateChecklistSchema.safeParse(raw);
+  if (!parsed.success) {
+    return { ok: false, error: "Parâmetros inválidos." };
   }
 
-  return runCollectAndPersist({
-    userId,
+  if (!isValidChecklistItemKey(parsed.data.itemKey)) {
+    return { ok: false, error: "Item de checklist desconhecido." };
+  }
+
+  const userId = await requireUserId();
+  const workspace = await findWorkspaceForUser(userId, workspaceId);
+  if (!workspace) {
+    return { ok: false, error: "Loja não encontrada." };
+  }
+
+  await upsertWorkspaceSeoChecklistItem({
     workspaceId,
-    workspaceName: workspace.name,
-    siteUrl: workspace.siteUrl,
-    auditUrl,
+    itemKey: parsed.data.itemKey,
+    status: parsed.data.status,
   });
+
+  revalidatePath(`/lojas/${workspaceId}/seo`);
+
+  return { ok: true };
 }

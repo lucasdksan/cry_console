@@ -1,7 +1,10 @@
 import { robotsNoindex } from "@/backend/lib/page-audit/html";
+import { crossDevicePerformanceGap } from "@/backend/lib/page-audit/pagespeed-normalize";
+import type { PageAuditRoleId } from "@/backend/lib/page-audit/roles";
+import { applyRoleSeoRules } from "@/backend/lib/page-audit/role-rules";
 import type {
   HtmlSignals,
-  PageSpeedSignals,
+  PageSpeedPair,
   SeoAuditBlock,
   SeoFinding,
   SeoModule,
@@ -61,12 +64,29 @@ function moduleScores(
 
 export function buildSeoAudit(input: {
   html: HtmlSignals | null;
-  pagespeed: PageSpeedSignals | null;
+  pagespeed: PageSpeedPair;
   storeContext: StoreContextBlock | null;
+  role: PageAuditRoleId;
 }): SeoAuditBlock {
   const findings: SeoFinding[] = [];
   const html = input.html;
-  const ps = input.pagespeed;
+  const ps = input.pagespeed.mobile;
+
+  const perfGap = crossDevicePerformanceGap(input.pagespeed);
+  if (perfGap != null && perfGap >= 15) {
+    findings.push({
+      id: "CROSS_DEVICE_PERF_GAP",
+      severity: "medium",
+      category: "performance",
+      title: "Performance mobile e desktop divergem de forma relevante",
+      whyItMatters:
+        "Gap grande entre mobile e desktop sugere experiência pior no celular, onde a indexação é priorizada.",
+      howToFix: [
+        "Comparar payload e scripts que degradam só no mobile.",
+        "Otimizar LCP/INP no perfil mobile após cada lote de correções.",
+      ],
+    });
+  }
 
   if (ps?.performanceScore != null && ps.performanceScore < 50) {
     findings.push({
@@ -229,6 +249,8 @@ export function buildSeoAudit(input: {
       ],
     });
   }
+
+  applyRoleSeoRules({ role: input.role, html, findings });
 
   const summary = countSummary(findings);
   const scores = moduleScores(findings);
