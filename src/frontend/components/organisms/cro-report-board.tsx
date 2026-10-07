@@ -1,7 +1,7 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 
 import {
   getWorkspacePageAuditSet,
@@ -55,11 +55,7 @@ export function CroReportBoard({ workspaceId, siteUrl, initial }: CroReportBoard
     return measured[0]?.role ?? "summary";
   });
 
-  useEffect(() => {
-    if (!tabValues.includes(activeTab)) {
-      setActiveTab("summary");
-    }
-  }, [activeTab, tabValues]);
+  const resolvedTab = tabValues.includes(activeTab) ? activeTab : "summary";
 
   const refresh = useCallback(async () => {
     const loaded = await getWorkspacePageAuditSet(workspaceId);
@@ -160,7 +156,7 @@ export function CroReportBoard({ workspaceId, siteUrl, initial }: CroReportBoard
         </p>
       ) : null}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={resolvedTab} onValueChange={setActiveTab}>
         <TabsList className="flex h-auto w-full flex-wrap gap-1">
           <TabsTrigger value="summary">Resumo</TabsTrigger>
           {measuredRoles.map((role) => (
