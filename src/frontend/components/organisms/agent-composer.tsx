@@ -18,7 +18,9 @@ import { Button } from "@/frontend/components/ui/button";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
 } from "@/frontend/components/ui/select";
 import { Textarea } from "@/frontend/components/ui/textarea";
@@ -47,6 +49,7 @@ type AgentComposerProps = {
   onQuickCommand?: (text: string) => void;
   onSubmit: (text: string) => void;
   skillSlashCatalog?: UserAgentSkillSlashPublic[];
+  initialText?: string;
 };
 
 function workspaceDisplayName(
@@ -83,8 +86,9 @@ export function AgentComposer({
   onQuickCommand,
   onSubmit,
   skillSlashCatalog = [],
+  initialText = "",
 }: AgentComposerProps) {
-  const [text, setText] = React.useState("");
+  const [text, setText] = React.useState(initialText);
   const [attachments, setAttachments] = React.useState<AgentTextAttachment[]>(
     [],
   );
@@ -108,6 +112,18 @@ export function AgentComposer({
   }, [skillSlashCatalog]);
 
   const selectedModel = modelOptions.find((o) => o.id === modelOptionId);
+
+  const modelOptionGroups = React.useMemo(() => {
+    const groups = new Map<string, AgentModelOption[]>();
+    for (const option of modelOptions) {
+      const key = option.groupLabel;
+      const list = groups.get(key) ?? [];
+      list.push(option);
+      groups.set(key, list);
+    }
+    return [...groups.entries()];
+  }, [modelOptions]);
+
   const workspaceLabel = workspaceDisplayName(
     workspaceId,
     workspaceChoices,
@@ -356,10 +372,15 @@ export function AgentComposer({
                 </span>
               </SelectTrigger>
               <SelectContent align="end">
-                {modelOptions.map((option) => (
-                  <SelectItem key={option.id} value={option.id}>
-                    {formatAgentModelTriggerLabel(option)}
-                  </SelectItem>
+                {modelOptionGroups.map(([groupLabel, items]) => (
+                  <SelectGroup key={groupLabel}>
+                    <SelectLabel>{groupLabel}</SelectLabel>
+                    {items.map((option) => (
+                      <SelectItem key={option.id} value={option.id}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 ))}
               </SelectContent>
             </Select>

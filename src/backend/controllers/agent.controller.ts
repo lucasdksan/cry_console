@@ -34,6 +34,12 @@ import {
 import {
   loadAgentWorkspaceContext,
 } from "@/backend/lib/agent/context";
+import {
+  AGENT_OBSERVABILITY_NO_WORKSPACE,
+  AGENT_OBSERVABILITY_UNAVAILABLE,
+  buildObservabilityPromptSection,
+} from "@/backend/lib/agent/observability";
+import { loadWorkspaceObservability } from "@/backend/controllers/observability-query";
 import { defaultAgentKnowledgeRetriever } from "@/backend/lib/agent/knowledge";
 import {
   buildAgentPrompt,
@@ -56,9 +62,11 @@ import {
   readPlatformGeminiConfig,
 } from "@/backend/lib/ai/platform-config";
 import {
-  labelForAiProvider,
-  isAiProviderKey,
-} from "@/backend/lib/ai/provider-catalog";
+  buildAgentModelOptions,
+  parseAgentModelOptionId,
+  type AgentModelOptionDto,
+} from "@/backend/lib/ai/model-options";
+import { isAiProviderKey } from "@/backend/lib/ai/provider-catalog";
 import {
   resolveModelForProvider,
   validateUserProviderConfig,
@@ -66,14 +74,17 @@ import {
 import { CredentialsCryptoError } from "@/backend/lib/account/credentials-crypto";
 import {
   appendAgentMessage,
+  countAgentMessages,
   updateAgentMessageParts,
   createAgentSession,
+  deleteAgentMessage,
   deleteAgentSessionForUser,
   findAgentSessionForUser,
   listAgentMessages,
   listAgentSessionsForUser,
   parseMessageParts,
   updateAgentSessionMeta,
+  type AgentSessionRow,
 } from "@/backend/models/agent-session.model";
 import { createAiUsageLog } from "@/backend/models/workspace-analysis.model";
 import {
@@ -84,13 +95,59 @@ import { listUserAgentSkillsForAgent } from "@/backend/models/user-agent-skill.m
 import { findWorkspaceForUser } from "@/backend/models/workspace.model";
 import type { AgentChatMode, AgentModelSource } from "@/generated/prisma/client";
 
-export type AgentModelOption = {
-  id: string;
-  label: string;
-  source: AgentModelSource;
-  providerKey?: string;
-  defaultModel?: string | null;
-};
+const OBSERVABILITY_PROMPT_TIMEOUT_MS = 8000;
+
+/** Nunca rejeita: o contexto do Sentry é opcional e não pode derrubar o turno. */
+async function resolveObservabilityPromptSection(
+  userId: string,
+  workspaceId: string | null,
+): Promise<string> {
+  if (!workspaceId) {
+    return AGENT_OBSERVABILITY_NO_WORKSPACE;
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const dto = await Promise.race([
+      loadWorkspaceObservability(userId, workspaceId),
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), OBSERVABILITY_PROMPT_TIMEOUT_MS);
+      }),
+    ]);
+    return dto
+      ? buildObservabilityPromptSection(dto)
+      : AGENT_OBSERVABILITY_UNAVAILABLE;
+  } catch {
+    return AGENT_OBSERVABILITY_UNAVAILABLE;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Remove a mensagem do usuário de um turno que falhou, para o banco refletir
+ * o rollback otimista do chat. A sessão só é apagada se ficou vazia e foi
+ * criada pelo próprio turno.
+ */
+async function discardFailedTurn(input: {
+  userId: string;
+  sessionId: string;
+  userMessageId: string;
+  discardSession: boolean;
+}): Promise<void> {
+  await deleteAgentMessage({
+    sessionId: input.sessionId,
+    messageId: input.userMessageId,
+  });
+  if (
+    input.discardSession &&
+    (await countAgentMessages(input.sessionId)) === 0
+  ) {
+    await deleteAgentSessionForUser(input.userId, input.sessionId);
+  }
+  revalidateAgentNav();
+}
+
+export type AgentModelOption = AgentModelOptionDto;
 
 async function requireUserId(): Promise<string> {
   const session = await auth();
@@ -151,40 +208,13 @@ export async function listAgentModelOptions(input: {
 }): Promise<AgentModelOption[]> {
   const userId = await requireUserId();
   const providers = await listUserAiProvidersForRouting(userId);
-  const options: AgentModelOption[] = [];
 
-  for (const provider of providers) {
-    if (!provider.hasApiToken || !isAiProviderKey(provider.providerKey)) {
-      continue;
-    }
-    options.push({
-      id: `user:${provider.providerKey}`,
-      label: labelForAiProvider(provider.providerKey),
-      source: "user_provider",
-      providerKey: provider.providerKey,
-      defaultModel: provider.defaultModel,
-    });
-  }
-
-  if (isPlatformGeminiConfigured()) {
-    const platform = readPlatformGeminiConfig();
-    options.push({
-      id: "platform",
-      label: "Meu modelo (Gemini)",
-      source: "platform",
-      defaultModel: platform.model,
-    });
-  }
-
-  if (input.chromeReady) {
-    options.push({
-      id: "browser",
-      label: "Nativo do navegador",
-      source: "browser",
-    });
-  }
-
-  return options;
+  return buildAgentModelOptions({
+    providers,
+    platformGeminiConfigured: isPlatformGeminiConfigured(),
+    platformModel: readPlatformGeminiConfig().model,
+    chromeReady: input.chromeReady,
+  });
 }
 
 export async function getAgentSessionDetail(sessionId: string): Promise<
@@ -378,22 +408,7 @@ function parseModelChoice(
   optionId: string,
   options: AgentModelOption[],
 ): AgentModelChoice | null {
-  if (optionId === "browser") {
-    return { source: "browser" };
-  }
-  if (optionId === "platform") {
-    return { source: "platform" };
-  }
-  if (optionId.startsWith("user:")) {
-    const providerKey = optionId.slice("user:".length);
-    const match = options.find((o) => o.id === optionId);
-    return {
-      source: "user_provider",
-      providerKey,
-      model: match?.defaultModel,
-    };
-  }
-  return null;
+  return parseAgentModelOptionId(optionId, options);
 }
 
 function titleFromMessage(text: string): string {
@@ -566,6 +581,14 @@ export async function sendAgentMessage(input: {
     };
   }
 
+  const options = await listAgentModelOptions({
+    chromeReady: input.chromeReady ?? false,
+  });
+  const modelChoice = parseModelChoice(input.modelOptionId, options);
+  if (!modelChoice) {
+    return { ok: false, error: "Modelo inválido." };
+  }
+
   const ensured = await ensureSession({
     userId,
     sessionId: input.sessionId,
@@ -583,23 +606,71 @@ export async function sendAgentMessage(input: {
 
   await updateAgentSessionMeta({ sessionId: session.id, mode });
 
-  const options = await listAgentModelOptions({
-    chromeReady: input.chromeReady ?? false,
-  });
-  const modelChoice = parseModelChoice(input.modelOptionId, options);
-  if (!modelChoice) {
-    return { ok: false, error: "Modelo inválido." };
-  }
-
   const userRow = await appendAgentMessage({
     sessionId: session.id,
     role: "user",
     content: messageText,
   });
 
-  if (mode === "plan") {
-    await markLatestPlanQuestionsAnswered(session.id);
+  const discard = () =>
+    discardFailedTurn({
+      userId,
+      sessionId: session.id,
+      userMessageId: userRow.id,
+      discardSession: !input.sessionId,
+    });
+
+  try {
+    const result = await runAgentTurn({
+      userId,
+      session,
+      mode,
+      messageText,
+      workspaceCommand,
+      agentSkillTurn,
+      modelChoice,
+      userMessageId: userRow.id,
+    });
+    if (!result.ok) {
+      await discard();
+    }
+    return result;
+  } catch (error) {
+    console.error("[agent] falha ao processar mensagem", error);
+    await discard().catch(() => undefined);
+    return {
+      ok: false,
+      error: "Não foi possível processar a mensagem. Tente novamente.",
+      retryable: true,
+    };
   }
+}
+
+async function runAgentTurn(input: {
+  userId: string;
+  session: AgentSessionRow;
+  mode: AgentChatMode;
+  messageText: string;
+  workspaceCommand?: AgentWorkspaceCommand;
+  agentSkillTurn: ResolvedAgentSkillTurn | null;
+  modelChoice: AgentModelChoice;
+  userMessageId: string;
+}): Promise<SendAgentMessageResult> {
+  const {
+    userId,
+    session,
+    mode,
+    messageText,
+    workspaceCommand,
+    agentSkillTurn,
+    modelChoice,
+    userMessageId,
+  } = input;
+
+  const observabilitySectionPromise = resolveObservabilityPromptSection(
+    userId,
+    session.workspaceId,
+  );
 
   if (session.title === "Nova conversa") {
     await updateAgentSessionMeta({
@@ -609,7 +680,7 @@ export async function sendAgentMessage(input: {
   }
 
   const history = (await listAgentMessages(session.id))
-    .filter((m) => m.id !== userRow.id)
+    .filter((m) => m.id !== userMessageId)
     .map((m) => ({
       role: m.role as "user" | "assistant",
       content: m.content,
@@ -641,6 +712,8 @@ export async function sendAgentMessage(input: {
     ? buildAgentSkillPromptMeta(agentSkillTurn, workspaceContext)
     : null;
 
+  const observabilitySection = await observabilitySectionPromise;
+
   const prompt = buildAgentPrompt({
     mode,
     userMessage: promptUserMessage,
@@ -649,6 +722,7 @@ export async function sendAgentMessage(input: {
     knowledgeChunks: knowledge,
     history,
     agentSkill: agentSkillPrompt,
+    observabilitySection,
   });
 
   if (modelChoice.source === "browser") {
@@ -658,7 +732,7 @@ export async function sendAgentMessage(input: {
       sessionId: session.id,
       needsBrowser: true,
       prompt,
-      userMessageId: userRow.id,
+      userMessageId,
     };
   }
 
@@ -711,6 +785,10 @@ export async function sendAgentMessage(input: {
     workspaceCommand,
     agentSkillTurn,
   });
+
+  if (mode === "plan") {
+    await markLatestPlanQuestionsAnswered(session.id);
+  }
 
   await appendAgentMessage({
     sessionId: session.id,
@@ -901,6 +979,10 @@ export async function completeBrowserAgentTurn(input: {
     agentSkillTurn,
   });
 
+  if (input.mode === "plan") {
+    await markLatestPlanQuestionsAnswered(session.id);
+  }
+
   await appendAgentMessage({
     sessionId: session.id,
     role: "assistant",
@@ -924,6 +1006,31 @@ export async function completeBrowserAgentTurn(input: {
     ok: true,
     messages: (await listAgentMessages(session.id)).map(toMessagePublic),
   };
+}
+
+/** Desfaz um turno do navegador que falhou no client (só a última mensagem do usuário). */
+export async function discardAgentTurn(input: {
+  sessionId: string;
+  userMessageId: string;
+  discardSession?: boolean;
+}): Promise<{ ok: boolean }> {
+  const userId = await requireUserId();
+  const session = await findAgentSessionForUser(userId, input.sessionId);
+  if (!session) {
+    return { ok: false };
+  }
+  const messages = await listAgentMessages(session.id);
+  const last = messages.at(-1);
+  if (!last || last.id !== input.userMessageId || last.role !== "user") {
+    return { ok: false };
+  }
+  await discardFailedTurn({
+    userId,
+    sessionId: session.id,
+    userMessageId: last.id,
+    discardSession: input.discardSession ?? false,
+  });
+  return { ok: true };
 }
 
 export async function approveAgentPlan(input: {
@@ -951,6 +1058,10 @@ export async function approveAgentPlan(input: {
   }
 
   let workspaceContext = null;
+  const observabilitySectionPromise = resolveObservabilityPromptSection(
+    userId,
+    session.workspaceId,
+  );
   if (session.workspaceId) {
     const workspace = await findWorkspaceForUser(userId, session.workspaceId);
     if (workspace) {
@@ -962,6 +1073,8 @@ export async function approveAgentPlan(input: {
     }
   }
 
+  const observabilitySection = await observabilitySectionPromise;
+
   const prompt = buildAgentPrompt({
     mode: "agent",
     userMessage: "Execute o plano aceito.",
@@ -971,6 +1084,7 @@ export async function approveAgentPlan(input: {
       content: m.content,
     })),
     approvedPlanMarkdown: pending.markdown,
+    observabilitySection,
   });
 
   const options = await listAgentModelOptions({

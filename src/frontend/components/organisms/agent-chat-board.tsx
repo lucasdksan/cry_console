@@ -9,6 +9,7 @@ import {
   approveAgentPlan,
   completeBrowserAgentTurn,
   deleteAgentSessionAction,
+  discardAgentTurn,
   listAgentModelOptions,
   renameAgentSessionAction,
   sendAgentMessage,
@@ -89,6 +90,10 @@ export function AgentChatBoard({
     UserAgentSkillSlashPublic[]
   >([]);
   const messagesRollbackRef = React.useRef<AgentMessagePublic[] | null>(null);
+  const [composerDraft, setComposerDraft] = React.useState({
+    key: 0,
+    text: "",
+  });
 
   const isEmpty = messages.length === 0;
   const showLanding = isEmpty && !session;
@@ -159,7 +164,17 @@ export function AgentChatBoard({
     onQuickCommand: (value: string) => void handleSend(value),
     onSubmit: (value: string) => void handleSend(value),
     skillSlashCatalog,
+    initialText: composerDraft.text,
   };
+
+  function failTurn(text: string, error: AgentChatErrorState) {
+    if (messagesRollbackRef.current) {
+      setMessages(messagesRollbackRef.current);
+      messagesRollbackRef.current = null;
+    }
+    setOperationError(error);
+    setComposerDraft((prev) => ({ key: prev.key + 1, text }));
+  }
 
   async function runBrowserGeneration(input: {
     sessionId: string;
@@ -190,17 +205,20 @@ export function AgentChatBoard({
       if (session) {
         setBusy(true);
         setThinkingTick(0);
-        const result = await sendAgentMessage({
-          sessionId: session.id,
-          mode: parsed.mode,
-          modelOptionId,
-          text,
-          chromeReady: await checkChromePromptReady(),
-        });
-        setBusy(false);
-        if (result.ok && "messages" in result) {
-          setMessages(result.messages);
-          await refreshAgentNav();
+        try {
+          const result = await sendAgentMessage({
+            sessionId: session.id,
+            mode: parsed.mode,
+            modelOptionId,
+            text,
+            chromeReady: await checkChromePromptReady(),
+          });
+          if (result.ok && "messages" in result) {
+            setMessages(result.messages);
+            await refreshAgentNav();
+          }
+        } finally {
+          setBusy(false);
         }
       }
       return;
@@ -227,6 +245,8 @@ export function AgentChatBoard({
     setBusy(true);
     setThinkingTick(0);
     setOperationError(null);
+    setComposerDraft((prev) => ({ ...prev, text: "" }));
+    let browserTurn: { sessionId: string; userMessageId: string } | null = null;
     try {
       const chromeReady = await checkChromePromptReady();
       const result = await sendAgentMessage({
@@ -239,46 +259,38 @@ export function AgentChatBoard({
       });
 
       if (!result.ok) {
-        if (messagesRollbackRef.current) {
-          setMessages(messagesRollbackRef.current);
-          messagesRollbackRef.current = null;
-        }
-        setOperationError({
+        failTurn(text, {
           message: result.error,
           retryable: result.retryable ?? false,
         });
-        await refreshAgentNav();
-        router.refresh();
-        return;
-      }
-      messagesRollbackRef.current = null;
-
-      if (!session && result.sessionId) {
-        await refreshAgentNav();
-        router.push(`/agente/${result.sessionId}`);
-        router.refresh();
         return;
       }
 
       if (result.needsBrowser) {
-        await runBrowserGeneration({
+        browserTurn = {
           sessionId: result.sessionId,
           userMessageId: result.userMessageId,
-          prompt: result.prompt,
-          mode,
-        });
+        };
+        await runBrowserGeneration({ ...browserTurn, prompt: result.prompt, mode });
+        browserTurn = null;
       } else if (result.messages) {
         setMessages(result.messages);
       }
+      messagesRollbackRef.current = null;
 
       await refreshAgentNav();
+      if (!session) {
+        router.push(`/agente/${result.sessionId}`);
+      }
       router.refresh();
     } catch (error) {
-      if (messagesRollbackRef.current) {
-        setMessages(messagesRollbackRef.current);
-        messagesRollbackRef.current = null;
+      if (browserTurn) {
+        await discardAgentTurn({
+          ...browserTurn,
+          discardSession: !session,
+        }).catch(() => undefined);
       }
-      setOperationError({
+      failTurn(text, {
         message:
           error instanceof Error ? error.message : "Não foi possível enviar.",
         retryable: false,
@@ -419,7 +431,17 @@ export function AgentChatBoard({
                 O que podemos fazer?
               </h1>
             </div>
-            <AgentComposer variant="centered" {...composerProps} />
+            {operationError ? (
+              <AgentChatErrorAlert
+                error={operationError}
+                onDismiss={() => setOperationError(null)}
+              />
+            ) : null}
+            <AgentComposer
+              key={composerDraft.key}
+              variant="centered"
+              {...composerProps}
+            />
           </div>
         </div>
       ) : (
@@ -445,7 +467,11 @@ export function AgentChatBoard({
           </div>
           <div className="sticky bottom-0 z-10 -mx-4 bg-gradient-to-t from-background via-background/80 to-transparent px-4 pt-8 sm:-mx-6 sm:px-6">
             <div className="mx-auto w-full max-w-3xl">
-              <AgentComposer variant="footer" {...composerProps} />
+              <AgentComposer
+                key={composerDraft.key}
+                variant="footer"
+                {...composerProps}
+              />
             </div>
           </div>
         </>

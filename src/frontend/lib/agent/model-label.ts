@@ -6,9 +6,11 @@ export function formatAgentModelTriggerLabel(
   if (!option) {
     return "Modelo";
   }
-  const model = option.defaultModel?.trim();
-  if (model) {
-    return `${option.label} · ${model}`;
+  if (option.source === "user_provider" && option.groupLabel) {
+    return `${option.groupLabel} · ${option.label}`;
+  }
+  if (option.source === "platform") {
+    return `Plataforma · ${option.label}`;
   }
   return option.label;
 }

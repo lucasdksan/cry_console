@@ -200,8 +200,9 @@ export const AGENT_MODE_META: Record<
   },
   ask: {
     label: "Ask",
-    description: "Tira dúvidas sobre VTEX, GA4, Clarity, GSC e o console.",
-    placeholder: "Pergunte sobre integrações e plataformas…",
+    description:
+      "Integrações e console; na loja da sessão, erros Sentry (sem métricas comerciais).",
+    placeholder: "Pergunte sobre integrações, Sentry ou plataformas…",
   },
 };
 

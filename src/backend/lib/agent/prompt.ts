@@ -12,18 +12,21 @@ import { resolvePlanConversationPhase } from "@/backend/lib/agent/plan-turn";
 export const AGENT_RESPONSE_STYLE_HINT =
   "Formate a resposta em prosa curta em português do Brasil. Use listas com hífen quando houver vários pontos. Use negrito (**texto**) só para números ou nomes de métricas. Evite títulos com # e blocos longos de markdown.";
 
+const OBSERVABILITY_INSTRUCTION =
+  "Para erros JavaScript, Web Vitals e replays de sessão, use somente a seção Observabilidade (Sentry) quando presente; não invente issues, contagens nem p75.";
+
 export function buildAgentSystemInstruction(mode: AgentChatMode): string {
   const base =
     "Você é o assistente do Cry Console para gestores de e-commerce. Responda em português do Brasil, de forma clara e acionável.";
 
   switch (mode) {
     case "ask":
-      return `${base} Modo Ask: responda apenas com base nos trechos do catálogo fornecidos. Não invente métricas da loja. ${AGENT_RESPONSE_STYLE_HINT}`;
+      return `${base} Modo Ask: responda com base no catálogo e, quando fornecida, na seção Observabilidade (Sentry). Não invente métricas comerciais da loja (receita, GA4, GSC, Clarity). ${OBSERVABILITY_INSTRUCTION} ${AGENT_RESPONSE_STYLE_HINT}`;
     case "plan":
-      return `${base} Modo Plan: o usuário revisa e aceita o plano antes da entrega. Não execute ações neste modo. Não invente scores ou valores em R$. Não use marcadores visuais ([[chart]], [[projection]], [[funnel]], [[action_plan]]) no modo Plan — eles serão gerados só após o aceite.`;
+      return `${base} Modo Plan: o usuário revisa e aceita o plano antes da entrega. Não execute ações neste modo. Não invente scores ou valores em R$. ${OBSERVABILITY_INSTRUCTION} Não use marcadores visuais ([[chart]], [[projection]], [[funnel]], [[action_plan]]) no modo Plan — eles serão gerados só após o aceite.`;
     case "agent":
     default:
-      return `${base} Modo Agent: use somente os dados fornecidos. Não invente scores, métricas ou impacto financeiro em R$. Se faltar dado, diga explicitamente. Marcadores visuais: [[chart:metric_key]], [[projection:metric_key]], [[funnel]], [[action_plan]]. ${AGENT_RESPONSE_STYLE_HINT}`;
+      return `${base} Modo Agent: use somente os dados fornecidos. Não invente scores, métricas ou impacto financeiro em R$. ${OBSERVABILITY_INSTRUCTION} Se faltar dado, diga explicitamente. Marcadores visuais: [[chart:metric_key]], [[projection:metric_key]], [[funnel]], [[action_plan]]. ${AGENT_RESPONSE_STYLE_HINT}`;
   }
 }
 
@@ -65,6 +68,7 @@ export function buildAgentPrompt(input: {
   approvedPlanMarkdown?: string;
   agentSkill?: { instruction: string; digest: string } | null;
   planPhase?: PlanConversationPhase;
+  observabilitySection?: string;
 }): string {
   const skillTurn = input.agentSkill ?? null;
   let systemInstruction = buildAgentSystemInstruction(input.mode);
@@ -79,8 +83,12 @@ export function buildAgentPrompt(input: {
   const sections: string[] = [systemInstruction];
 
   if (input.mode === "ask" && !skillTurn) {
+    const catalogTitle =
+      input.observabilitySection !== undefined
+        ? "## Catálogo"
+        : "## Catálogo (fonte única)";
     sections.push(
-      "## Catálogo (fonte única)",
+      catalogTitle,
       buildAskPromptSection(
         (input.knowledgeChunks ?? []).map((c) => ({
           title: `${c.platform} — ${c.title}`,
@@ -100,6 +108,10 @@ export function buildAgentPrompt(input: {
     sections.push("## Dados da loja\nNenhum workspace vinculado a esta sessão.");
   } else {
     sections.push("## Dados da loja\nNenhum workspace vinculado a esta sessão.");
+  }
+
+  if (input.observabilitySection !== undefined) {
+    sections.push("## Observabilidade (Sentry)", input.observabilitySection);
   }
 
   if (skillTurn) {

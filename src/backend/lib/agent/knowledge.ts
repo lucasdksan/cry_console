@@ -45,7 +45,24 @@ const CATALOG: AgentKnowledgeChunk[] = [
     title: "Modos Agent, Plan e Ask",
     keywords: ["agent", "plan", "ask", "modo", "console"],
     content:
-      "Agent consulta dados já salvos da loja. Plan propõe um plano em markdown para você aceitar antes de gerar entregáveis. Ask responde sobre plataformas sem ler métricas da loja.",
+      "Agent consulta dados já salvos da loja (métricas e análise). Plan propõe um plano em markdown para você aceitar antes de gerar entregáveis. Ask responde sobre plataformas e, na sessão com loja, também lê erros e Web Vitals do Sentry — sem receita, GA4, GSC ou Clarity.",
+  },
+  {
+    id: "console-observability",
+    platform: "Cry Console",
+    title: "Observabilidade Sentry",
+    keywords: [
+      "sentry",
+      "observabilidade",
+      "erro",
+      "javascript",
+      "vitals",
+      "lcp",
+      "replay",
+      "tunnel",
+    ],
+    content:
+      "Cada loja pode ter um projeto Sentry provisionado pelo Cry Console. O script e o tunnel (/api/observability) enviam eventos com tag page_type (home, plp, pdp). O quadro Observabilidade lista issues, Web Vitals e replays. No Agente, a seção Observabilidade (Sentry) resume esses dados para análise em Agent, Plan e Ask.",
   },
   {
     id: "console-workspace",
@@ -61,7 +78,7 @@ const CATALOG: AgentKnowledgeChunk[] = [
     title: "Modelos de IA",
     keywords: ["modelo", "openai", "deepseek", "gemini", "provedor"],
     content:
-      "Você pode usar provedores cadastrados na conta, o Gemini da plataforma (quando configurado) ou o modelo nativo do Chrome via Prompt API.",
+      "Cadastre provedores (OpenAI, Gemini, Grok, Anthropic, DeepSeek ou outro) nas configurações da conta com o token da API; escolha o modelo no seletor do chat do Agente. Também há o Gemini da plataforma (quando configurado) e o modelo nativo do Chrome via Prompt API.",
   },
 ];
 

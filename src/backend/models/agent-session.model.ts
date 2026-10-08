@@ -152,6 +152,19 @@ export async function appendAgentMessage(input: {
   return row;
 }
 
+export async function deleteAgentMessage(input: {
+  sessionId: string;
+  messageId: string;
+}): Promise<void> {
+  await prisma.agentMessage.deleteMany({
+    where: { id: input.messageId, sessionId: input.sessionId },
+  });
+}
+
+export async function countAgentMessages(sessionId: string): Promise<number> {
+  return prisma.agentMessage.count({ where: { sessionId } });
+}
+
 export function parseMessageParts(value: unknown): AgentMessageParts["parts"] {
   if (!value || typeof value !== "object") {
     return [];
