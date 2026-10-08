@@ -12,9 +12,15 @@ import {
   SentryApiError,
   SentryConfigError,
 } from "@/backend/lib/sentry";
+import { loadIssueAnalysesForProject } from "@/backend/lib/sentry/issue-analysis";
+import {
+  OBSERVABILITY_ISSUE_ANALYSIS_LIMIT,
+  type ObservabilityIssueAnalysisDTO,
+} from "@/backend/lib/sentry/observability-dto";
 import { findWorkspaceForUser } from "@/backend/models/workspace.model";
 import {
   findObservabilityForUserWorkspace,
+  findObservabilityInsightsContextForUser,
   saveObservabilityPatternsForUser,
 } from "@/backend/models/observability.model";
 
@@ -120,5 +126,45 @@ export async function saveObservability(
     return { success: "Observabilidade salva. Copie o script abaixo para a loja." };
   } catch {
     return { error: "Não foi possível salvar a observabilidade." };
+  }
+}
+
+const issueAnalysisRequestSchema = z.object({
+  workspaceId: z.string().trim().min(1).max(64),
+  issueIds: z
+    .array(z.string().regex(/^\d{1,20}$/))
+    .max(OBSERVABILITY_ISSUE_ANALYSIS_LIMIT),
+});
+
+export async function loadObservabilityIssueAnalyses(
+  workspaceId: string,
+  issueIds: string[],
+): Promise<Record<string, ObservabilityIssueAnalysisDTO>> {
+  const session = await auth();
+  if (!session?.user?.id || !isSentryServerConfigured()) {
+    return {};
+  }
+
+  const parsed = issueAnalysisRequestSchema.safeParse({ workspaceId, issueIds });
+  if (!parsed.success || parsed.data.issueIds.length === 0) {
+    return {};
+  }
+
+  const context = await findObservabilityInsightsContextForUser(
+    session.user.id,
+    parsed.data.workspaceId,
+  );
+  if (!context) {
+    return {};
+  }
+
+  try {
+    return await loadIssueAnalysesForProject({
+      workspaceId: context.workspaceId,
+      projectSlug: context.sentryProjectSlug,
+      issueIds: parsed.data.issueIds,
+    });
+  } catch {
+    return {};
   }
 }

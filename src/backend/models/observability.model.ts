@@ -184,6 +184,44 @@ export async function saveObservabilityPatternsForUser(
   });
 }
 
+export type ObservabilityInsightsContext = {
+  workspaceId: string;
+  sentryProjectSlug: string;
+  sentryProjectId: string;
+};
+
+export async function findObservabilityInsightsContextForUser(
+  userId: string,
+  workspaceId: string,
+): Promise<ObservabilityInsightsContext | null> {
+  const workspace = await prisma.workspace.findFirst({
+    where: { id: workspaceId, userId },
+    select: { id: true },
+  });
+  if (!workspace) {
+    return null;
+  }
+
+  const row = await prisma.workspaceObservability.findUnique({
+    where: { workspaceId },
+    select: {
+      workspaceId: true,
+      sentryProjectSlug: true,
+      sentryProjectId: true,
+    },
+  });
+
+  if (!row?.sentryProjectSlug || !row.sentryProjectId) {
+    return null;
+  }
+
+  return {
+    workspaceId: row.workspaceId,
+    sentryProjectSlug: row.sentryProjectSlug,
+    sentryProjectId: row.sentryProjectId,
+  };
+}
+
 export async function getSentryProjectSlugForUserWorkspace(
   userId: string,
   workspaceId: string,

@@ -3,6 +3,11 @@ import { SentryApiError } from "@/backend/lib/sentry/errors";
 export const SENTRY_PROJECT_PERMISSION_MESSAGE =
   "SENTRY_AUTH_TOKEN não pode criar ou gerenciar projetos no Sentry. Organization Auth Tokens (prefixo sntrys_) só têm o escopo org:ci. Crie uma Internal Integration em Settings → Custom Integrations, com Organization: Read, Team: Read e Project: Admin, e use o token gerado.";
 
+export const SENTRY_READ_PERMISSION_MESSAGE =
+  "O token não pode ler issues, Web Vitals ou replays no Sentry. Na mesma Internal Integration, inclua Event: Read (além de Organization Read, Team Read e Project Admin). Reinicie o servidor após atualizar o .env.";
+
+export type SentryApiFailureContext = "project" | "insights";
+
 export function isSentryOrganizationAuthToken(token: string): boolean {
   return token.startsWith("sntrys_");
 }
@@ -39,9 +44,20 @@ export function messageForSentryApiFailure(
   status: number,
   body: string,
   token: string,
+  context: SentryApiFailureContext = "project",
 ): string {
-  if (status === 403 || isSentryOrganizationAuthToken(token)) {
+  if (isSentryOrganizationAuthToken(token)) {
     return SENTRY_PROJECT_PERMISSION_MESSAGE;
   }
-  return parseSentryErrorBody(body) || `Sentry HTTP ${status}`;
+
+  const detail = parseSentryErrorBody(body);
+
+  if (status === 403) {
+    if (context === "insights") {
+      return detail || SENTRY_READ_PERMISSION_MESSAGE;
+    }
+    return SENTRY_PROJECT_PERMISSION_MESSAGE;
+  }
+
+  return detail || `Sentry HTTP ${status}`;
 }

@@ -1,4 +1,11 @@
-import { BarChart3, Bell, MousePointerClick, Search, Settings } from "lucide-react";
+import {
+  Activity,
+  BarChart3,
+  Bell,
+  MousePointerClick,
+  Search,
+  Settings,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export type WorkspaceActionDefinition = {
@@ -20,6 +27,12 @@ export const WORKSPACE_ACTION_CATALOG: WorkspaceActionDefinition[] = [
     label: "Avisos",
     icon: Bell,
     href: (workspaceId) => `/lojas/${workspaceId}/avisos`,
+  },
+  {
+    id: "observabilidade",
+    label: "Observabilidade",
+    icon: Activity,
+    href: (workspaceId) => `/lojas/${workspaceId}/observabilidade`,
   },
   {
     id: "analise",

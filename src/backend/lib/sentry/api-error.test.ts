@@ -6,6 +6,7 @@ import {
   messageForSentryApiFailure,
   parseSentryErrorBody,
   SENTRY_PROJECT_PERMISSION_MESSAGE,
+  SENTRY_READ_PERMISSION_MESSAGE,
 } from "@/backend/lib/sentry/api-error";
 import { SentryApiError } from "@/backend/lib/sentry/errors";
 
@@ -38,14 +39,29 @@ describe("sentry api-error", () => {
     expect(parseSentryErrorBody("")).toBe("");
   });
 
-  it("maps 403 permission errors to Internal Integration guidance", () => {
+  it("maps 403 de projeto para orientação de Internal Integration", () => {
     expect(
       messageForSentryApiFailure(
         403,
         '{"detail":"You do not have permission to perform this action."}',
         "deadbeef",
+        "project",
       ),
     ).toBe(SENTRY_PROJECT_PERMISSION_MESSAGE);
+  });
+
+  it("maps 403 de leitura para Event: Read ou detail do Sentry", () => {
+    expect(
+      messageForSentryApiFailure(
+        403,
+        '{"detail":"You do not have permission to perform this action."}',
+        "deadbeef",
+        "insights",
+      ),
+    ).toBe("You do not have permission to perform this action.");
+    expect(
+      messageForSentryApiFailure(403, "", "deadbeef", "insights"),
+    ).toBe(SENTRY_READ_PERMISSION_MESSAGE);
   });
 
   it("keeps non-403 details for other Sentry failures", () => {

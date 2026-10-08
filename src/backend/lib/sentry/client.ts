@@ -1,6 +1,7 @@
 import {
   assertSentryTokenCanManageProjects,
   messageForSentryApiFailure,
+  type SentryApiFailureContext,
 } from "@/backend/lib/sentry/api-error";
 import {
   parseSentryServerConfig,
@@ -41,9 +42,47 @@ function authHeaders(token: string): Record<string, string> {
   };
 }
 
+export async function sentryApiGet<T>(
+  path: string,
+  searchParams?: URLSearchParams,
+  options?: { timeoutMs?: number },
+): Promise<T> {
+  const query = searchParams?.toString();
+  const fullPath = query ? `${path}?${query}` : path;
+  return sentryFetch<T>(
+    fullPath,
+    { method: "GET", signal: timeoutSignal(options?.timeoutMs) },
+    "insights",
+  );
+}
+
+export async function sentryApiPost<T>(
+  path: string,
+  body: unknown,
+  options?: { timeoutMs?: number },
+): Promise<T> {
+  return sentryFetch<T>(
+    path,
+    {
+      method: "POST",
+      body: JSON.stringify(body ?? {}),
+      signal: timeoutSignal(options?.timeoutMs),
+    },
+    "insights",
+  );
+}
+
+function timeoutSignal(timeoutMs: number | undefined): AbortSignal | undefined {
+  if (timeoutMs === undefined) {
+    return undefined;
+  }
+  return AbortSignal.timeout(timeoutMs);
+}
+
 async function sentryFetch<T>(
   path: string,
   init: RequestInit,
+  context: SentryApiFailureContext = "project",
 ): Promise<T> {
   const { authToken } = parseSentryServerConfig();
   const response = await fetch(`${SENTRY_API_BASE}${path}`, {
@@ -57,7 +96,7 @@ async function sentryFetch<T>(
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     throw new SentryApiError(
-      messageForSentryApiFailure(response.status, text, authToken),
+      messageForSentryApiFailure(response.status, text, authToken, context),
       response.status,
       path,
     );
