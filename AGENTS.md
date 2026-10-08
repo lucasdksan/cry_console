@@ -14,7 +14,7 @@ Documentação operacional do repositório. Visão de produto e diagramas mais a
 
 ## O que é este projeto
 
-Monólito **Next.js 16** (App Router) para o Cry Console — plataforma B2B de insights para e-commerce. Hoje o código cobre **autenticação**, **proxy de rotas** e **shell** da área privada; integrações (GA4, Clarity, GSC, VTEX) são roadmap.
+Monólito **Next.js 16** (App Router) para o Cry Console — plataforma B2B de insights para e-commerce. Hoje o código cobre autenticação, lojas (workspaces) com credenciais VTEX/GA4/Clarity criptografadas, avisos com metas e mínimo esperado, análise, auditoria SEO/CRO (PageSpeed), observabilidade via Sentry e o agente de IA (`/agente`). Lista de rotas e funcionalidades: [README.md](./README.md#funcionalidades).
 
 ## Onde colocar código
 
@@ -24,6 +24,8 @@ Monólito **Next.js 16** (App Router) para o Cry Console — plataforma B2B de i
 | Rota HTTP / webhook | `src/app/api/...` |
 | Regra de sessão, redirect, rate limit na borda | `src/proxy.ts` + `src/backend/lib/proxy/` |
 | Server Action ou mutação server-side | `src/backend/controllers/` (`"use server"`) |
+| Leitura server-side chamada por página (não deve virar POST) | `src/backend/controllers/*-query.ts` **sem** `"use server"` (ex.: `observability-query.ts`) |
+| Nova ação no menu da loja | `src/frontend/navigation/workspace-actions.ts` + página em `src/app/(private)/lojas/[id]/` |
 | Query/mutation Prisma por entidade | `src/backend/models/` |
 | Config Auth.js, callbacks | `src/backend/auth.ts`, `auth.config.ts` |
 | Utilitário backend sem I/O | `src/backend/lib/<domínio>/` (ver abaixo) |
@@ -41,12 +43,14 @@ Código puro ou infra por domínio, **sem prefixo repetido no nome do arquivo** 
 | Pasta | Conteúdo |
 |-------|----------|
 | `account/` | políticas e crypto de conta |
-| `agent/` | chat, plano, gráficos do agente |
-| `ai/` | roteamento e geração de texto |
+| `agent/` | chat, prompt, plano, gráficos, skills e seção de observabilidade do agente |
+| `ai/` | catálogo de provedores/modelos, opções do seletor, roteamento e geração de texto |
 | `analysis/` | heurísticas, LLM, scoring, DTOs |
 | `auth/` | rate limit, redirect, tokens |
-| `clarity/`, `google/`, `measurement/`, `sentry/`, `vtex/` | integrações |
+| `clarity/`, `google/`, `measurement/`, `vtex/` | integrações |
+| `sentry/` | cliente da API, túnel/script público, insights (issues, vitals, replays), severidade, diagnóstico e cache |
 | `overview/` | visão geral e status de fontes |
+| `page-audit/` | auditoria SEO/CRO por papel de página, PageSpeed, checklist |
 | `proxy/` | rotas públicas e política do proxy |
 | `shared/` | adaptadores usados por vários domínios |
 | `workspace/` | métricas, períodos, políticas de loja |
@@ -85,10 +89,19 @@ Substitui o middleware tradicional nesta versão do Next. Ao alterar comportamen
 
 Matcher atual exclui `api`, assets estáticos e arquivos com extensão.
 
+## Convenções de domínio
+
+- **Provedores de IA** — `ai/provider-catalog.ts` é a fonte única de provedores e modelos populares. Para provedores conhecidos, o modelo é escolhido no chat (não salvo nas configurações) e validado contra o catálogo; só o provedor `custom` guarda `defaultModel` e `baseUrl`. Provedor novo OpenAI-compatible: adicionar ao catálogo e a `OPENAI_COMPAT_BASE` em `ai/generate.ts`.
+- **Agente** — o contexto do Sentry é opcional: `resolveObservabilityPromptSection` tem timeout e nunca rejeita. Se o turno falhar, a mensagem do usuário é removida (e a sessão, se ficou vazia e foi criada no turno), espelhando o rollback otimista do chat.
+- **Sentry** — chamadas de leitura usam `sentryApiGet`/`sentryApiPost` (contexto `insights`, que gera a mensagem de permissão Event Read em 403). Sem `SENTRY_*` configurado, a página retorna DTO vazio com status `not_configured`, sem quebrar.
+- **Avisos** — meta e mínimo esperado são salvos juntos (`minExpectedValue < targetValue`). Métricas acumuladoras são comparadas proporcionalmente aos dias decorridos; métricas de taxa, pelo valor absoluto (`workspace/alert-status.ts`).
+
 ## Dados
 
 - PostgreSQL via `DATABASE_URL`; migrations usam `DIRECT_URL` quando definido (`prisma.config.ts`).
 - Após mudar `schema.prisma`: `pnpm exec prisma migrate dev` (local) e commitar migrations.
+- Credenciais de lojas e tokens de IA são gravados criptografados (`account/credentials-crypto.ts`, chave `CREDENTIALS_ENCRYPTION_KEY`); nunca persistir em texto puro.
+- Variáveis de ambiente: tabela no [README.md](./README.md#variáveis-de-ambiente); novas variáveis entram em `.env.example` com placeholder.
 
 ## Testes e qualidade
 
