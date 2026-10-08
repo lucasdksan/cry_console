@@ -8,7 +8,10 @@ import {
   saveUserAiProvider,
   type AccountSettingsActionState,
 } from "@/backend/controllers/account-settings.controller";
-import { AI_PROVIDER_CATALOG } from "@/backend/lib/ai/provider-catalog";
+import {
+  AI_PROVIDER_CATALOG,
+  isKnownAiProviderKey,
+} from "@/backend/lib/ai/provider-catalog";
 import type {
   UserAiProviderPublic,
   UserAiProvidersPublic,
@@ -38,6 +41,7 @@ export function AccountSettingsProviderCard({
   onProvidersChange,
 }: AccountSettingsProviderCardProps) {
   const catalog = AI_PROVIDER_CATALOG[provider.providerKey];
+  const knownProvider = isKnownAiProviderKey(provider.providerKey);
   const formId = `provider-form-${provider.providerKey}`;
 
   const [state, formAction, pending] = useActionState<
@@ -116,28 +120,27 @@ export function AccountSettingsProviderCard({
             value={configured ? "1" : "0"}
           />
 
-          <FormField
-            id={`${provider.providerKey}-defaultModel`}
-            label="Modelo padrão"
-            error={state.fieldErrors?.defaultModel?.[0]}
-          >
-            <Input
+          {knownProvider ? (
+            <p className="text-sm text-muted-foreground">
+              Escolha o modelo no seletor do chat do Agente após configurar o
+              token.
+            </p>
+          ) : (
+            <FormField
               id={`${provider.providerKey}-defaultModel`}
-              name="defaultModel"
-              list={`${provider.providerKey}-model-suggestions`}
-              defaultValue={provider.defaultModel ?? ""}
-              placeholder="Identificador do modelo"
-              autoComplete="off"
-              className="rounded-[var(--radius-md)] border-border bg-background"
-            />
-          </FormField>
-          {catalog.modelSuggestions.length > 0 ? (
-            <datalist id={`${provider.providerKey}-model-suggestions`}>
-              {catalog.modelSuggestions.map((id) => (
-                <option key={id} value={id} />
-              ))}
-            </datalist>
-          ) : null}
+              label="Modelo"
+              error={state.fieldErrors?.defaultModel?.[0]}
+            >
+              <Input
+                id={`${provider.providerKey}-defaultModel`}
+                name="defaultModel"
+                defaultValue={provider.defaultModel ?? ""}
+                placeholder="Identificador do modelo"
+                autoComplete="off"
+                className="rounded-[var(--radius-md)] border-border bg-background"
+              />
+            </FormField>
+          )}
 
           {provider.providerKey === "custom" ? (
             <FormField

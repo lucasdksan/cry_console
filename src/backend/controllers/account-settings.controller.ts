@@ -3,7 +3,10 @@
 import { redirect } from "next/navigation";
 
 import { auth } from "@/backend/auth";
-import { isAiProviderKey } from "@/backend/lib/ai/provider-catalog";
+import {
+  isAiProviderKey,
+  isKnownAiProviderKey,
+} from "@/backend/lib/ai/provider-catalog";
 import {
   validateAiBaseUrlInput,
   validateAiModelInput,
@@ -92,12 +95,24 @@ export async function saveUserAiProvider(
 
   const hasApiToken = formData.get("hasApiToken") === "1";
   const isDefault = formData.get("isDefault") === "1";
-  const modelRaw = optionalTrimmed(formData.get("defaultModel"));
-  const modelResult = validateAiModelInput(modelRaw);
-  if (modelResult.error) {
-    return {
-      fieldErrors: { defaultModel: [modelResult.error] },
-    };
+
+  let defaultModel: string | null = null;
+  if (providerKeyRaw === "custom") {
+    const modelRaw = optionalTrimmed(formData.get("defaultModel"));
+    const modelResult = validateAiModelInput(modelRaw);
+    if (modelResult.error) {
+      return {
+        fieldErrors: { defaultModel: [modelResult.error] },
+      };
+    }
+    if (!modelResult.value) {
+      return {
+        fieldErrors: {
+          defaultModel: ["Informe o identificador do modelo."],
+        },
+      };
+    }
+    defaultModel = modelResult.value;
   }
 
   const baseUrlRaw = optionalTrimmed(formData.get("baseUrl"));
@@ -128,7 +143,7 @@ export async function saveUserAiProvider(
   try {
     const providers = await upsertUserAiProviderForUser(userId, {
       providerKey: providerKeyRaw,
-      defaultModel: modelResult.value,
+      defaultModel: isKnownAiProviderKey(providerKeyRaw) ? null : defaultModel,
       baseUrl: providerKeyRaw === "custom" ? baseUrlResult.value : null,
       isDefault,
       apiToken: apiTokenUpdate,

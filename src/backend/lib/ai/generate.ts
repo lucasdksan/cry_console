@@ -11,6 +11,7 @@ import type { UserAiProviderCredentials } from "@/backend/models/user-ai-provide
 const OPENAI_COMPAT_BASE: Partial<Record<AiProviderKey, string>> = {
   openai: "https://api.openai.com/v1",
   deepseek: "https://api.deepseek.com/v1",
+  xai: "https://api.x.ai/v1",
 };
 
 export class AiGenerateError extends Error {
@@ -195,7 +196,11 @@ export async function generateTextWithUserProvider(
     return generateWithAnthropic({ apiToken, model, prompt });
   }
 
-  if (providerKey === "openai" || providerKey === "deepseek") {
+  if (
+    providerKey === "openai" ||
+    providerKey === "deepseek" ||
+    providerKey === "xai"
+  ) {
     const baseUrl = OPENAI_COMPAT_BASE[providerKey];
     if (!baseUrl) {
       throw new AiGenerateError("Base da API não configurada.");

@@ -1,5 +1,7 @@
 import {
   AI_PROVIDER_CATALOG,
+  isKnownAiProviderKey,
+  isPopularModelForProvider,
   type AiProviderKey,
 } from "@/backend/lib/ai/provider-catalog";
 
@@ -40,8 +42,8 @@ export function resolveModelForProvider(
   if (defaultModel?.trim()) {
     return defaultModel.trim();
   }
-  const suggestions = AI_PROVIDER_CATALOG[providerKey].modelSuggestions;
-  return suggestions[0] ?? null;
+  const first = AI_PROVIDER_CATALOG[providerKey].popularModels[0];
+  return first?.id ?? null;
 }
 
 export function resolveUserAiProvider(
@@ -119,6 +121,28 @@ export function validateUserProviderConfig(
       message: "Configure um modelo para o provedor de IA.",
     };
   }
+
+  const explicit = requestedModel?.trim();
+  if (explicit && isKnownAiProviderKey(providerKey)) {
+    if (!isPopularModelForProvider(providerKey, explicit)) {
+      return {
+        kind: "error",
+        code: "custom_missing_config",
+        message: "Modelo inválido para este provedor.",
+      };
+    }
+  }
+
+  if (providerKey === "custom" && explicit && defaultModel?.trim()) {
+    if (explicit !== defaultModel.trim()) {
+      return {
+        kind: "error",
+        code: "custom_missing_config",
+        message: "Modelo inválido para o provedor personalizado.",
+      };
+    }
+  }
+
   return null;
 }
 
