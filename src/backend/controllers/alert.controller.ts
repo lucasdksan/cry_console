@@ -58,12 +58,18 @@ const metricKeySchema = z.enum([
   "gsc_clicks",
 ]);
 
-const saveTargetSchema = z.object({
-  workspaceId: z.string().min(1),
-  metricKey: metricKeySchema,
-  periodType: periodTypeSchema,
-  targetValue: z.coerce.number().positive(),
-});
+const saveTargetSchema = z
+  .object({
+    workspaceId: z.string().min(1),
+    metricKey: metricKeySchema,
+    periodType: periodTypeSchema,
+    targetValue: z.coerce.number().positive(),
+    minExpectedValue: z.coerce.number().positive(),
+  })
+  .refine((data) => data.minExpectedValue < data.targetValue, {
+    message: "O mínimo esperado deve ser menor que a meta.",
+    path: ["minExpectedValue"],
+  });
 
 const clearTargetSchema = z.object({
   workspaceId: z.string().min(1),
@@ -333,13 +339,16 @@ export async function saveWorkspaceMetricTarget(
     metricKey: formData.get("metricKey"),
     periodType: formData.get("periodType"),
     targetValue: formData.get("targetValue"),
+    minExpectedValue: formData.get("minExpectedValue"),
   });
 
   if (!parsed.success) {
-    return { error: "Meta inválida." };
+    const firstIssue = parsed.error.issues[0]?.message;
+    return { error: firstIssue ?? "Limites inválidos." };
   }
 
-  const { workspaceId, metricKey, periodType, targetValue } = parsed.data;
+  const { workspaceId, metricKey, periodType, targetValue, minExpectedValue } =
+    parsed.data;
   const owned = await assertWorkspaceOwnedByUser(userId, workspaceId);
   if (!owned) {
     return { error: "Loja não encontrada." };
@@ -350,11 +359,12 @@ export async function saveWorkspaceMetricTarget(
     metricKey as WorkspaceMetricKey,
     periodType,
     targetValue,
+    minExpectedValue,
   );
 
   revalidatePath(`/lojas/${workspaceId}/avisos`);
 
-  return { success: "Meta salva." };
+  return { success: "Limites salvos." };
 }
 
 export async function clearWorkspaceMetricTarget(
@@ -386,5 +396,5 @@ export async function clearWorkspaceMetricTarget(
 
   revalidatePath(`/lojas/${workspaceId}/avisos`);
 
-  return { success: "Meta removida." };
+  return { success: "Limites removidos." };
 }

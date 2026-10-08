@@ -3,10 +3,14 @@ import {
   metricValueFromSnapshot,
 } from "@/backend/lib/workspace/alert-metrics";
 import {
+  computeMetricProjectionRisk,
+  computeMetricZoneStatus,
   computePaceStatus,
   computeProgressPct,
   computeProjection,
   type AlertPaceStatus,
+  type MetricProjectionRisk,
+  type MetricZoneStatus,
 } from "@/backend/lib/workspace/alert-status";
 import type { WorkspaceCalendarPeriod } from "@/backend/lib/workspace/period";
 import {
@@ -31,11 +35,15 @@ export type AvisosMetricCard = {
   source: AvisosSourceKey;
   unit: "currency" | "count" | "percent";
   target: number | null;
+  minExpected: number | null;
   current: number | null;
   progressPct: number | null;
   projection: number | null;
   status: AlertPaceStatus | null;
   hasTarget: boolean;
+  hasBand: boolean;
+  zoneStatus: MetricZoneStatus | null;
+  projectionRisk: MetricProjectionRisk | null;
   targetHitStatus: MetricTargetHitStatus;
   series: MetricSeriesPoint[];
 };
@@ -89,15 +97,16 @@ function sourceStatusFromSnapshot(
   }
 }
 
-function targetFor(
+function targetRowFor(
   targets: MetricTargetRow[],
   key: WorkspaceMetricKey,
   periodType: "week" | "month",
-): number | null {
-  const row = targets.find(
-    (t) => t.metricKey === key && t.periodType === periodType,
+): MetricTargetRow | null {
+  return (
+    targets.find(
+      (t) => t.metricKey === key && t.periodType === periodType,
+    ) ?? null
   );
-  return row?.targetValue ?? null;
 }
 
 export function buildWorkspaceAvisosDto(input: {
@@ -121,12 +130,25 @@ export function buildWorkspaceAvisosDto(input: {
 
   const metricsBySource = new Map<AvisosSourceKey, AvisosMetricCard[]>();
   for (const def of METRIC_DEFINITIONS) {
-    const target = targetFor(targets, def.key, periodType);
+    const targetRow = targetRowFor(targets, def.key, periodType);
+    const target = targetRow?.targetValue ?? null;
+    const minExpected = targetRow?.minExpectedValue ?? null;
+    const hasBand =
+      target !== null &&
+      minExpected !== null &&
+      minExpected > 0 &&
+      target > minExpected;
     const current = snapshot
       ? metricValueFromSnapshot(def.key, snapshot)
       : null;
+    const projection = computeProjection(
+      def.key,
+      current,
+      period.elapsedDays,
+      period.totalDays,
+    );
     const status =
-      target !== null
+      target !== null && !hasBand
         ? computePaceStatus({
             metricKey: def.key,
             current,
@@ -135,6 +157,24 @@ export function buildWorkspaceAvisosDto(input: {
             totalDays: period.totalDays,
           })
         : null;
+    const zoneStatus = hasBand
+      ? computeMetricZoneStatus({
+          metricKey: def.key,
+          current,
+          minExpected,
+          target,
+          elapsedDays: period.elapsedDays,
+          totalDays: period.totalDays,
+        })
+      : null;
+    const projectionRisk = hasBand
+      ? computeMetricProjectionRisk({
+          metricKey: def.key,
+          projection,
+          minExpected,
+          target,
+        })
+      : null;
 
     const card: AvisosMetricCard = {
       key: def.key,
@@ -142,19 +182,15 @@ export function buildWorkspaceAvisosDto(input: {
       source: def.source,
       unit: def.unit,
       target,
+      minExpected: hasBand ? minExpected : null,
       current,
       progressPct: computeProgressPct(current, target),
-      projection:
-        target !== null
-          ? computeProjection(
-              def.key,
-              current,
-              period.elapsedDays,
-              period.totalDays,
-            )
-          : null,
+      projection,
       status,
       hasTarget: target !== null,
+      hasBand,
+      zoneStatus,
+      projectionRisk,
       targetHitStatus: computeMetricTargetHitStatus({ current, target }),
       series: buildMetricCumulativeSeries({
         metricKey: def.key,

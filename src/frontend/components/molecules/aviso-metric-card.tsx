@@ -8,10 +8,19 @@ import {
   type AlertActionState,
 } from "@/backend/controllers/alert.controller";
 import type { AvisosMetricCard } from "@/backend/lib/workspace/avisos-dto";
+import type {
+  MetricProjectionRisk,
+  MetricZoneStatus,
+} from "@/backend/lib/workspace/alert-status";
 import { FormField } from "@/frontend/components/atoms/form-field";
+import {
+  RangeBar,
+  type RangeBarTone,
+} from "@/frontend/components/atoms/range-bar";
 import { Badge } from "@/frontend/components/ui/badge";
 import { Button } from "@/frontend/components/ui/button";
 import { Input } from "@/frontend/components/ui/input";
+import { cn } from "@/frontend/lib/utils";
 
 type AvisoMetricCardProps = {
   workspaceId: string;
@@ -63,9 +72,31 @@ function statusLabel(status: AvisosMetricCard["status"]): string | null {
   }
 }
 
+function zoneLabel(status: MetricZoneStatus): string {
+  switch (status) {
+    case "below_min":
+      return "Abaixo do mínimo";
+    case "in_band":
+      return "Dentro do esperado";
+    case "on_meta_pace":
+      return "No ritmo da meta";
+  }
+}
+
+function projectionRiskLabel(risk: MetricProjectionRisk): string {
+  switch (risk) {
+    case "wont_hit_min":
+      return "Não vai atingir o mínimo";
+    case "wont_hit_meta":
+      return "Não vai atingir a meta";
+    case "on_course":
+      return "Projeção no alvo";
+  }
+}
+
 function hitLabel(status: AvisosMetricCard["targetHitStatus"]): string | null {
   if (status === "reached") {
-    return "Atingida";
+    return "Meta atingida";
   }
   if (status === "not_reached") {
     return "Ainda não";
@@ -98,6 +129,93 @@ function statusVariant(
     default:
       return "outline";
   }
+}
+
+function zoneVariant(
+  status: MetricZoneStatus,
+): "default" | "secondary" | "destructive" | "outline" {
+  switch (status) {
+    case "below_min":
+      return "destructive";
+    case "in_band":
+      return "outline";
+    case "on_meta_pace":
+      return "default";
+  }
+}
+
+function projectionRiskVariant(
+  risk: MetricProjectionRisk,
+): "default" | "secondary" | "destructive" | "outline" {
+  switch (risk) {
+    case "wont_hit_min":
+      return "destructive";
+    case "wont_hit_meta":
+      return "secondary";
+    case "on_course":
+      return "default";
+  }
+}
+
+function zoneTone(status: MetricZoneStatus): RangeBarTone {
+  switch (status) {
+    case "below_min":
+      return "danger";
+    case "in_band":
+      return "ok";
+    case "on_meta_pace":
+      return "primary";
+  }
+}
+
+function bandBadges(metric: AvisosMetricCard): Array<{
+  key: string;
+  label: string;
+  variant: "default" | "secondary" | "destructive" | "outline";
+  className?: string;
+}> {
+  if (!metric.hasBand || !metric.zoneStatus) {
+    return [];
+  }
+
+  const badges: Array<{
+    key: string;
+    label: string;
+    variant: "default" | "secondary" | "destructive" | "outline";
+    className?: string;
+  }> = [];
+
+  const metaReached = metric.targetHitStatus === "reached";
+  const showZone =
+    !metaReached || metric.zoneStatus !== "on_meta_pace";
+
+  if (showZone) {
+    badges.push({
+      key: "zone",
+      label: zoneLabel(metric.zoneStatus),
+      variant: zoneVariant(metric.zoneStatus),
+      className:
+        metric.zoneStatus === "in_band"
+          ? "border-brand-secondary/40 bg-brand-secondary/10 text-brand-secondary"
+          : undefined,
+    });
+  }
+
+  if (metaReached) {
+    badges.push({
+      key: "hit",
+      label: "Meta atingida",
+      variant: "default",
+    });
+  } else if (metric.projectionRisk && metric.projectionRisk !== "on_course") {
+    badges.push({
+      key: "risk",
+      label: projectionRiskLabel(metric.projectionRisk),
+      variant: projectionRiskVariant(metric.projectionRisk),
+    });
+  }
+
+  return badges.slice(0, 2);
 }
 
 export function AvisoMetricCard({
@@ -137,6 +255,7 @@ export function AvisoMetricCard({
   const bannerSuccess = saveState.success ?? clearState.success;
   const statusText = statusLabel(metric.status);
   const hitText = hitLabel(metric.targetHitStatus);
+  const bandBadgeList = bandBadges(metric);
   const cardRing = selected ? "ring-2 ring-primary/60" : "border-border/60";
   const cardInteractive = onSelect
     ? "cursor-pointer transition hover:border-primary/40"
@@ -172,23 +291,39 @@ export function AvisoMetricCard({
           <input type="hidden" name="workspaceId" value={workspaceId} />
           <input type="hidden" name="metricKey" value={metric.key} />
           <input type="hidden" name="periodType" value={periodType} />
-          <FormField id={`target-${metric.key}`} label="Meta">
-            <Input
-              id={`target-${metric.key}`}
-              name="targetValue"
-              type="number"
-              min={0}
-              step={metric.unit === "percent" ? "0.01" : "1"}
-              defaultValue={metric.target ?? undefined}
-              placeholder={
-                metric.unit === "percent" ? "Ex.: 2,5" : "Ex.: 1000"
-              }
-              required
-            />
-          </FormField>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <FormField id={`min-${metric.key}`} label="Mínimo esperado">
+              <Input
+                id={`min-${metric.key}`}
+                name="minExpectedValue"
+                type="number"
+                min={0}
+                step={metric.unit === "percent" ? "0.01" : "1"}
+                defaultValue={metric.minExpected ?? undefined}
+                placeholder={
+                  metric.unit === "percent" ? "Ex.: 1,5" : "Ex.: 800"
+                }
+                required
+              />
+            </FormField>
+            <FormField id={`target-${metric.key}`} label="Meta">
+              <Input
+                id={`target-${metric.key}`}
+                name="targetValue"
+                type="number"
+                min={0}
+                step={metric.unit === "percent" ? "0.01" : "1"}
+                defaultValue={metric.target ?? undefined}
+                placeholder={
+                  metric.unit === "percent" ? "Ex.: 2,5" : "Ex.: 1000"
+                }
+                required
+              />
+            </FormField>
+          </div>
           <div className="flex flex-wrap gap-2">
             <Button type="submit" size="sm" disabled={savePending}>
-              {savePending ? "Salvando…" : "Salvar meta"}
+              {savePending ? "Salvando…" : "Salvar limites"}
             </Button>
             {metric.hasTarget ? (
               <Button
@@ -226,12 +361,23 @@ export function AvisoMetricCard({
         <div className="flex flex-col gap-1">
           <p className="text-sm font-medium">{metric.label}</p>
           <div className="flex flex-wrap gap-1">
-            {hitText ? (
+            {metric.hasBand
+              ? bandBadgeList.map((badge) => (
+                  <Badge
+                    key={badge.key}
+                    variant={badge.variant}
+                    className={cn(badge.className)}
+                  >
+                    {badge.label}
+                  </Badge>
+                ))
+              : null}
+            {!metric.hasBand && hitText ? (
               <Badge variant={hitVariant(metric.targetHitStatus)}>
                 {hitText}
               </Badge>
             ) : null}
-            {statusText ? (
+            {!metric.hasBand && statusText ? (
               <Badge variant={statusVariant(metric.status)}>{statusText}</Badge>
             ) : null}
           </div>
@@ -245,7 +391,7 @@ export function AvisoMetricCard({
             setEditing(true);
           }}
         >
-          Editar meta
+          Editar limites
         </Button>
       </div>
       {bannerError ? (
@@ -261,20 +407,38 @@ export function AvisoMetricCard({
             {formatValue(metric.unit, metric.current)}
           </dd>
         </div>
-        <div className="flex flex-col gap-0.5">
-          <dt className="text-muted-foreground">Meta</dt>
-          <dd className="font-medium tabular-nums">
-            {formatValue(metric.unit, metric.target)}
-          </dd>
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <dt className="text-muted-foreground">Progresso</dt>
-          <dd className="font-medium tabular-nums">
-            {metric.progressPct !== null
-              ? `${pctFmt.format(metric.progressPct)}%`
-              : "—"}
-          </dd>
-        </div>
+        {metric.hasBand ? (
+          <div className="flex flex-col gap-0.5">
+            <dt className="text-muted-foreground">Mínimo</dt>
+            <dd className="font-medium tabular-nums">
+              {formatValue(metric.unit, metric.minExpected)}
+            </dd>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-0.5">
+            <dt className="text-muted-foreground">Meta</dt>
+            <dd className="font-medium tabular-nums">
+              {formatValue(metric.unit, metric.target)}
+            </dd>
+          </div>
+        )}
+        {metric.hasBand ? (
+          <div className="flex flex-col gap-0.5">
+            <dt className="text-muted-foreground">Meta</dt>
+            <dd className="font-medium tabular-nums">
+              {formatValue(metric.unit, metric.target)}
+            </dd>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-0.5">
+            <dt className="text-muted-foreground">Progresso</dt>
+            <dd className="font-medium tabular-nums">
+              {metric.progressPct !== null
+                ? `${pctFmt.format(metric.progressPct)}%`
+                : "—"}
+            </dd>
+          </div>
+        )}
         <div className="flex flex-col gap-0.5">
           <dt className="text-muted-foreground">Projeção</dt>
           <dd className="font-medium tabular-nums">
@@ -282,6 +446,19 @@ export function AvisoMetricCard({
           </dd>
         </div>
       </dl>
+      {metric.hasBand &&
+      metric.minExpected !== null &&
+      metric.target !== null &&
+      metric.projection !== null &&
+      metric.zoneStatus ? (
+        <RangeBar
+          fillValue={metric.projection}
+          minMarker={metric.minExpected}
+          maxMarker={metric.target}
+          tone={zoneTone(metric.zoneStatus)}
+          ariaLabel={`Projeção de ${metric.label} em relação ao mínimo e à meta`}
+        />
+      ) : null}
       <form
         action={clearAction}
         onClick={(event) => event.stopPropagation()}
@@ -295,7 +472,7 @@ export function AvisoMetricCard({
           size="sm"
           disabled={clearPending}
         >
-          {clearPending ? "Removendo…" : "Remover meta"}
+          {clearPending ? "Removendo…" : "Remover limites"}
         </Button>
       </form>
     </div>

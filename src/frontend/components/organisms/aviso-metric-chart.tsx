@@ -4,6 +4,7 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceArea,
   ReferenceLine,
   XAxis,
   YAxis,
@@ -111,6 +112,10 @@ export function AvisoMetricChart({
       label: metric.label,
       color: "var(--primary)",
     },
+    min: {
+      label: "Mínimo",
+      color: "var(--status-failed)",
+    },
     target: {
       label: "Meta",
       color: "var(--status-untested)",
@@ -118,17 +123,25 @@ export function AvisoMetricChart({
   } satisfies ChartConfig;
 
   const hit = hitLabel(metric.targetHitStatus);
+  const hasBand =
+    metric.hasBand &&
+    metric.minExpected !== null &&
+    metric.target !== null;
 
   return (
     <Card>
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-1">
-          <CardTitle>Meta no período</CardTitle>
+          <CardTitle>
+            {hasBand ? "Limites no período" : "Meta no período"}
+          </CardTitle>
           <CardDescription>
-            Curva acumulada e linha da meta — {metric.label}
+            {hasBand
+              ? `Curva acumulada, faixa esperada e meta — ${metric.label}`
+              : `Curva acumulada e linha da meta — ${metric.label}`}
           </CardDescription>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           {hit ? (
             <Badge variant={hitVariant(metric.targetHitStatus)}>{hit}</Badge>
           ) : null}
@@ -138,7 +151,7 @@ export function AvisoMetricChart({
               onSelectKey(value as AvisosMetricCard["key"])
             }
           >
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full sm:w-[180px]">
               <SelectValue placeholder="Métrica" />
             </SelectTrigger>
             <SelectContent>
@@ -189,6 +202,28 @@ export function AvisoMetricChart({
                   />
                 }
               />
+              {hasBand ? (
+                <ReferenceArea
+                  y1={metric.minExpected!}
+                  y2={metric.target!}
+                  fill="var(--status-ok)"
+                  fillOpacity={0.12}
+                  ifOverflow="extendDomain"
+                />
+              ) : null}
+              {hasBand ? (
+                <ReferenceLine
+                  y={metric.minExpected!}
+                  stroke="var(--color-min)"
+                  strokeDasharray="4 4"
+                  label={{
+                    value: "Mín.",
+                    position: "insideBottomLeft",
+                    fill: "var(--muted-foreground)",
+                    fontSize: 12,
+                  }}
+                />
+              ) : null}
               {metric.target !== null ? (
                 <ReferenceLine
                   y={metric.target}

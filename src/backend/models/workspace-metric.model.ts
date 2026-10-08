@@ -15,6 +15,7 @@ export type MetricTargetRow = {
   metricKey: WorkspaceMetricKey;
   periodType: WorkspaceMetricPeriodType;
   targetValue: number;
+  minExpectedValue: number | null;
 };
 
 export type MetricSnapshotUpsertInput = {
@@ -61,6 +62,8 @@ function toTargetRow(row: WorkspaceMetricTarget): MetricTargetRow {
     metricKey: row.metricKey,
     periodType: row.periodType,
     targetValue: Number(row.targetValue),
+    minExpectedValue:
+      row.minExpectedValue !== null ? Number(row.minExpectedValue) : null,
   };
 }
 
@@ -114,6 +117,7 @@ export async function upsertMetricTarget(
   metricKey: WorkspaceMetricKey,
   periodType: WorkspaceMetricPeriodType,
   targetValue: number,
+  minExpectedValue: number,
 ): Promise<MetricTargetRow> {
   const row = await prisma.workspaceMetricTarget.upsert({
     where: {
@@ -128,9 +132,11 @@ export async function upsertMetricTarget(
       metricKey,
       periodType,
       targetValue: new Prisma.Decimal(targetValue),
+      minExpectedValue: new Prisma.Decimal(minExpectedValue),
     },
     update: {
       targetValue: new Prisma.Decimal(targetValue),
+      minExpectedValue: new Prisma.Decimal(minExpectedValue),
     },
   });
   return toTargetRow(row);

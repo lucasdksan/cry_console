@@ -274,8 +274,9 @@ model WorkspaceMetricTarget {
   workspaceId  String
   metricKey    WorkspaceMetricKey
   periodType   WorkspaceMetricPeriodType
-  targetValue  Decimal                   @db.Decimal(18, 4)
-  createdAt    DateTime                  @default(now())
+  targetValue        Decimal                   @db.Decimal(18, 4)
+  minExpectedValue   Decimal?                  @db.Decimal(18, 4)
+  createdAt          DateTime                  @default(now())
   updatedAt    DateTime                  @updatedAt
 
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
