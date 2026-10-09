@@ -335,12 +335,24 @@ function filterPillarsForCommand(
   return measurement.pillars;
 }
 
-export function buildAskPromptSection(chunks: { title: string; content: string }[]): string {
+export function buildAskPromptSection(
+  chunks: { title: string; content: string; section?: string; url?: string }[],
+): string {
   if (chunks.length === 0) {
-    return "Nenhum trecho do catálogo local encontrado. Responda com conhecimento geral sobre integrações de e-commerce e diga quando não souber.";
+    return "Nenhum trecho relevante encontrado (Help Center ou catálogo). Para navegação no Admin VTEX ou VTEX IO, descreva só o que souber com segurança e indique consultar help.vtex.com; diga quando não souber o caminho exato.";
   }
   return chunks
-    .map((c) => `### ${c.title}\n${c.content}`)
+    .map((c) => {
+      const meta = [
+        c.section ? `Caminho no Help Center: ${c.section}` : null,
+        c.url ? `URL: ${c.url}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n");
+      return meta
+        ? `### ${c.title}\n${meta}\n\n${c.content}`
+        : `### ${c.title}\n${c.content}`;
+    })
     .join("\n\n");
 }
 

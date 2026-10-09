@@ -1,3 +1,4 @@
+import { ASK_ADMIN_NAVIGATION_HINT } from "@/backend/lib/agent/ask-knowledge-query";
 import type { AgentChatMode } from "@/generated/prisma/client";
 import {
   buildAskPromptSection,
@@ -21,7 +22,16 @@ export function buildAgentSystemInstruction(mode: AgentChatMode): string {
 
   switch (mode) {
     case "ask":
-      return `${base} Modo Ask: responda com base no catálogo e, quando fornecida, na seção Observabilidade (Sentry). Não invente métricas comerciais da loja (receita, GA4, GSC, Clarity). ${OBSERVABILITY_INSTRUCTION} ${AGENT_RESPONSE_STYLE_HINT}`;
+      return [
+        base,
+        "Modo Ask: responda com base nos trechos do VTEX Help Center e do catálogo abaixo e, quando fornecida, na seção Observabilidade (Sentry).",
+        "Priorize o Help Center quando houver trechos com Caminho/URL; não invente telas, menus ou URLs que não apareçam nas fontes.",
+        ASK_ADMIN_NAVIGATION_HINT,
+        "Ao final, indique o link do artigo (URL) usado como referência principal.",
+        "Não invente métricas comerciais da loja (receita, GA4, GSC, Clarity).",
+        OBSERVABILITY_INSTRUCTION,
+        AGENT_RESPONSE_STYLE_HINT,
+      ].join(" ");
     case "plan":
       return `${base} Modo Plan: o usuário revisa e aceita o plano antes da entrega. Não execute ações neste modo. Não invente scores ou valores em R$. ${OBSERVABILITY_INSTRUCTION} Não use marcadores visuais ([[chart]], [[projection]], [[funnel]], [[action_plan]]) no modo Plan — eles serão gerados só após o aceite.`;
     case "agent":
@@ -83,16 +93,24 @@ export function buildAgentPrompt(input: {
   const sections: string[] = [systemInstruction];
 
   if (input.mode === "ask" && !skillTurn) {
+    const chunks = input.knowledgeChunks ?? [];
+    const hasHelpCenter = chunks.some((c) => c.platform === "VTEX Help Center");
     const catalogTitle =
       input.observabilitySection !== undefined
-        ? "## Catálogo"
-        : "## Catálogo (fonte única)";
+        ? hasHelpCenter
+          ? "## Base de conhecimento (VTEX Help Center e catálogo)"
+          : "## Catálogo"
+        : hasHelpCenter
+          ? "## Base de conhecimento (VTEX Help Center e catálogo — fonte principal)"
+          : "## Catálogo (fonte única)";
     sections.push(
       catalogTitle,
       buildAskPromptSection(
-        (input.knowledgeChunks ?? []).map((c) => ({
+        chunks.map((c) => ({
           title: `${c.platform} — ${c.title}`,
           content: c.content,
+          section: c.section,
+          url: c.url,
         })),
       ),
     );

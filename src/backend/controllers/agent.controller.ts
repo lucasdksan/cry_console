@@ -40,7 +40,7 @@ import {
   buildObservabilityPromptSection,
 } from "@/backend/lib/agent/observability";
 import { loadWorkspaceObservability } from "@/backend/controllers/observability-query";
-import { defaultAgentKnowledgeRetriever } from "@/backend/lib/agent/knowledge";
+import { searchAgentKnowledge } from "@/backend/lib/agent/knowledge";
 import {
   buildAgentPrompt,
   isValidPlanMarkdown,
@@ -701,7 +701,7 @@ async function runAgentTurn(input: {
 
   const knowledge =
     mode === "ask" && !agentSkillTurn
-      ? defaultAgentKnowledgeRetriever.search(messageText)
+      ? await searchAgentKnowledge(messageText)
       : [];
 
   const promptUserMessage = agentSkillTurn

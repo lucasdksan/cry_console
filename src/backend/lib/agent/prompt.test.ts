@@ -79,4 +79,27 @@ describe("buildAgentPrompt", () => {
     expect(prompt).toContain("## Catálogo (fonte única)");
     expect(prompt).not.toContain("## Observabilidade (Sentry)");
   });
+
+  it("ask com Help Center inclui caminho e instrução passo a passo", () => {
+    const prompt = buildAgentPrompt({
+      mode: "ask",
+      userMessage: "Como enviar feedback no Admin?",
+      history: [],
+      knowledgeChunks: [
+        {
+          id: "1",
+          platform: "VTEX Help Center",
+          title: "Admin VTEX",
+          keywords: ["vtex"],
+          content: "1. Clique na Central de Informações.",
+          section: "Tutoriais > Admin VTEX > Fornecendo feedbacks",
+          url: "https://help.vtex.com/pt/docs/tutorials/admin-vtex-comece-aqui",
+        },
+      ],
+    });
+    expect(prompt).toContain("Base de conhecimento (VTEX Help Center");
+    expect(prompt).toContain("Caminho no Help Center:");
+    expect(prompt).toMatch(/passos numerados/);
+    expect(prompt).toMatch(/Admin VTEX \(operacional\/legacy\)/);
+  });
 });

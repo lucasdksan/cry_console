@@ -201,8 +201,8 @@ export const AGENT_MODE_META: Record<
   ask: {
     label: "Ask",
     description:
-      "Integrações e console; na loja da sessão, erros Sentry (sem métricas comerciais).",
-    placeholder: "Pergunte sobre integrações, Sentry ou plataformas…",
+      "Help Center VTEX (incl. tutoriais no Admin e VTEX IO), integrações e Sentry na loja da sessão.",
+    placeholder: "Ex.: como chegar a uma tela no Admin VTEX ou VTEX IO…",
   },
 };
 
