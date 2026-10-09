@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUp, Bot, FolderOpen, Loader2, Paperclip, Store, X } from "lucide-react";
+import { ArrowUp, Loader2, Paperclip, X } from "lucide-react";
 import * as React from "react";
 
 import type { AgentChatMode } from "@/generated/prisma/client";
@@ -12,7 +12,6 @@ import {
   type AgentSlashCatalogEntry,
 } from "@/backend/lib/agent/command";
 import type { UserAgentSkillSlashPublic } from "@/backend/models/user-agent-skill.model";
-import { AGENT_MODE_META } from "@/backend/lib/agent/types";
 import { Badge } from "@/frontend/components/ui/badge";
 import { Button } from "@/frontend/components/ui/button";
 import {
@@ -25,6 +24,8 @@ import {
 } from "@/frontend/components/ui/select";
 import { Textarea } from "@/frontend/components/ui/textarea";
 import { AgentContextBar } from "@/frontend/components/molecules/agent-context-bar";
+import { AgentModeSelect } from "@/frontend/components/molecules/agent-mode-select";
+import { AgentWorkspaceSelect } from "@/frontend/components/molecules/agent-workspace-select";
 import {
   appendAttachmentsToMessage,
   readAgentTextAttachments,
@@ -51,24 +52,6 @@ type AgentComposerProps = {
   skillSlashCatalog?: UserAgentSkillSlashPublic[];
   initialText?: string;
 };
-
-function workspaceDisplayName(
-  workspaceId: string | null,
-  workspaceChoices: { id: string; name: string }[],
-  mode: AgentChatMode,
-): string {
-  const match = workspaceChoices.find((w) => w.id === workspaceId);
-  if (match) {
-    return match.name;
-  }
-  if (mode === "ask") {
-    return "Sem loja (Ask)";
-  }
-  if (workspaceId) {
-    return "Loja selecionada";
-  }
-  return "Workspace";
-}
 
 export function AgentComposer({
   variant = "footer",
@@ -123,12 +106,6 @@ export function AgentComposer({
     }
     return [...groups.entries()];
   }, [modelOptions]);
-
-  const workspaceLabel = workspaceDisplayName(
-    workspaceId,
-    workspaceChoices,
-    mode,
-  );
 
   async function handleFiles(fileList: FileList | null) {
     if (!fileList?.length) {
@@ -289,38 +266,14 @@ export function AgentComposer({
             >
               <Paperclip className="size-4" />
             </Button>
-            {!workspaceLocked && onWorkspaceIdChange ? (
-              <Select
-                value={workspaceId ?? "none"}
-                onValueChange={(value) =>
-                  onWorkspaceIdChange(value === "none" ? null : value)
-                }
-                disabled={disabled}
-              >
-                <SelectTrigger
-                  size="sm"
-                  className="h-8 max-w-[min(11rem,38vw)] border-0 bg-transparent text-muted-foreground shadow-none"
-                >
-                  <Store className="size-3.5 shrink-0 text-muted-foreground" />
-                  <span className="truncate text-sm">{workspaceLabel}</span>
-                </SelectTrigger>
-                <SelectContent>
-                  {mode === "ask" ? (
-                    <SelectItem value="none">Sem loja (Ask)</SelectItem>
-                  ) : null}
-                  {workspaceChoices.map((ws) => (
-                    <SelectItem key={ws.id} value={ws.id}>
-                      {ws.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <span className="inline-flex h-8 max-w-[min(11rem,38vw)] items-center gap-1.5 truncate rounded-md px-1.5 text-sm text-muted-foreground">
-                <FolderOpen className="size-3.5 shrink-0" />
-                <span className="truncate">{workspaceLabel}</span>
-              </span>
-            )}
+            <AgentWorkspaceSelect
+              mode={mode}
+              workspaceId={workspaceId}
+              workspaceChoices={workspaceChoices}
+              onWorkspaceIdChange={onWorkspaceIdChange}
+              locked={workspaceLocked}
+              disabled={disabled}
+            />
           </div>
 
           <div className="flex min-w-0 shrink-0 items-center gap-1 sm:gap-2">
@@ -329,35 +282,11 @@ export function AgentComposer({
                 Pensando… {thinkingSeconds}s
               </span>
             ) : null}
-            <Select
-              value={mode}
-              onValueChange={(value) => onModeChange(value as AgentChatMode)}
+            <AgentModeSelect
+              mode={mode}
+              onModeChange={onModeChange}
               disabled={disabled}
-            >
-              <SelectTrigger
-                size="sm"
-                className="h-8 w-fit max-w-[7.5rem] border-0 bg-transparent text-muted-foreground shadow-none"
-              >
-                <Bot className="size-3.5 shrink-0 text-muted-foreground" />
-                <span className="truncate text-sm">
-                  {(AGENT_MODE_META[mode] ?? AGENT_MODE_META.agent).label}
-                </span>
-              </SelectTrigger>
-              <SelectContent align="end">
-                {(Object.keys(AGENT_MODE_META) as AgentChatMode[]).map(
-                  (key) => (
-                    <SelectItem key={key} value={key}>
-                      <span className="font-medium">
-                        {AGENT_MODE_META[key].label}
-                      </span>
-                      <span className="block text-xs text-muted-foreground">
-                        {AGENT_MODE_META[key].description}
-                      </span>
-                    </SelectItem>
-                  ),
-                )}
-              </SelectContent>
-            </Select>
+            />
             <Select
               value={modelOptionId}
               onValueChange={(value) => onModelOptionIdChange(value ?? "")}
