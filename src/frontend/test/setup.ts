@@ -14,7 +14,6 @@ vi.mock("next/image", () => ({
     width,
     height,
     className,
-    ...rest
   }: {
     src: string;
     alt: string;
@@ -30,6 +29,5 @@ vi.mock("next/image", () => ({
       width,
       height,
       className,
-      ...rest,
     }),
 }));
