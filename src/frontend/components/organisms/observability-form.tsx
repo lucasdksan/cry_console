@@ -7,6 +7,7 @@ import {
   type ObservabilityActionState,
 } from "@/backend/controllers/observability.controller";
 import type { ObservabilityPublic } from "@/backend/models/observability.model";
+import { CopyButton } from "@/frontend/components/atoms/copy-button";
 import { FormField } from "@/frontend/components/atoms/form-field";
 import { Badge } from "@/frontend/components/ui/badge";
 import { Button } from "@/frontend/components/ui/button";
@@ -236,9 +237,16 @@ export function ObservabilityForm({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <pre className="overflow-x-auto rounded-[var(--radius-md)] border border-border bg-muted/30 p-3 text-xs">
-              {scriptSnippet}
-            </pre>
+            <div className="relative">
+              <pre className="overflow-x-auto rounded-[var(--radius-md)] border border-border bg-muted/30 p-3 pr-28 text-xs">
+                {scriptSnippet}
+              </pre>
+              <CopyButton
+                value={scriptSnippet}
+                label="Copiar script"
+                className="absolute top-2 right-2"
+              />
+            </div>
           </CardContent>
         </Card>
       ) : null}
