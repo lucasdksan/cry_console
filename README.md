@@ -186,6 +186,8 @@ A aplicação sobe em [http://localhost:3000](http://localhost:3000).
 | `pnpm prisma:generate` | Gera o client Prisma |
 | `pnpm prisma:migrate` | `prisma migrate dev` |
 | `pnpm brand:export-logo` | Exporta assets de logo a partir do SVG |
+| `pnpm index:vtex-help:discover` | Descobre links do Help Center VTEX (Playwright) e grava em `tmp/vtex-help-links.json` |
+| `pnpm index:vtex-help` | Descobre (ou reutiliza links), extrai conteúdo, gera embeddings Gemini e faz upsert no Pinecone |
 
 ### Variáveis de ambiente
 
@@ -200,6 +202,9 @@ Ver `.env.example`:
 | `CREDENTIALS_ENCRYPTION_KEY` | 32 bytes em base64 — criptografa credenciais das lojas e tokens de IA |
 | `SENTRY_ORG_SLUG`, `SENTRY_TEAM_SLUG`, `SENTRY_AUTH_TOKEN` | Observabilidade. O token deve ser de uma **Internal Integration** (não Organization Auth Token `sntrys_`) com Organization Read, Team Read, Project Admin e **Event Read** |
 | `GEMINI_API_KEY`, `GEMINI_MODEL` | Gemini da plataforma (opcional) |
+| `GEMINI_EMBEDDING_MODEL` | Modelo de embedding para indexação do Help Center VTEX (padrão: `gemini-embedding-001`) |
+| `GEMINI_EMBEDDING_DIMENSION` | Dimensão do vetor (padrão: `768`; deve coincidir com o índice Pinecone) |
+| `PINECONE_API_KEY`, `PINECONE_INDEX`, `PINECONE_NAMESPACE` | Base vetorial do modo **Ask** com documentação VTEX (opcional; sem isso o Ask usa catálogo local) |
 | `PAGESPEED_API_KEY` | PageSpeed Insights na auditoria SEO/CRO (opcional; sem chave a cota é menor) |
 
 ## CI/CD

@@ -93,6 +93,7 @@ Matcher atual exclui `api`, assets estáticos e arquivos com extensão.
 
 - **Provedores de IA** — `ai/provider-catalog.ts` é a fonte única de provedores e modelos populares. Para provedores conhecidos, o modelo é escolhido no chat (não salvo nas configurações) e validado contra o catálogo; só o provedor `custom` guarda `defaultModel` e `baseUrl`. Provedor novo OpenAI-compatible: adicionar ao catálogo e a `OPENAI_COMPAT_BASE` em `ai/generate.ts`.
 - **Agente** — o contexto do Sentry é opcional: `resolveObservabilityPromptSection` tem timeout e nunca rejeita. Se o turno falhar, a mensagem do usuário é removida (e a sessão, se ficou vazia e foi criada no turno), espelhando o rollback otimista do chat.
+- **Modo Ask / Help Center VTEX** — com `PINECONE_*` e `GEMINI_API_KEY`, `searchAgentKnowledge` consulta chunks indexados (`agent/help-center-pinecone.ts`); sem Pinecone, cai no catálogo local (`agent/knowledge.ts`). Indexação sob demanda: `pnpm index:vtex-help` (Playwright em `scripts/` + lib `agent/help-center-scraper.ts`).
 - **Sentry** — chamadas de leitura usam `sentryApiGet`/`sentryApiPost` (contexto `insights`, que gera a mensagem de permissão Event Read em 403). Sem `SENTRY_*` configurado, a página retorna DTO vazio com status `not_configured`, sem quebrar.
 - **Avisos** — meta e mínimo esperado são salvos juntos (`minExpectedValue < targetValue`). Métricas acumuladoras são comparadas proporcionalmente aos dias decorridos; métricas de taxa, pelo valor absoluto (`workspace/alert-status.ts`).
 
