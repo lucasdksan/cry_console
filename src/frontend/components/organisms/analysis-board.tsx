@@ -32,6 +32,8 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/frontend/components/ui/tabs";
+import { AnalysisPortfolioTab } from "@/frontend/components/molecules/analysis-portfolio-tab";
+import { formatAnalysisMetricValue } from "@/frontend/lib/format-analysis-metric";
 import { cn } from "@/frontend/lib/utils";
 
 type AnalysisBoardProps = {
@@ -228,6 +230,7 @@ export function AnalysisBoard({
           <TabsTrigger value="pilares">Pilares</TabsTrigger>
           <TabsTrigger value="plano">Plano</TabsTrigger>
           <TabsTrigger value="lacunas">Lacunas</TabsTrigger>
+          <TabsTrigger value="portfolio">Portfólio</TabsTrigger>
         </TabsList>
         <TabsContent value="pilares" className="flex flex-col gap-4">
           {data.measurement.pillars.map((pillar) => {
@@ -259,7 +262,9 @@ export function AnalysisBoard({
                       {Object.entries(pillar.metrics).map(([key, value]) => (
                         <li key={key}>
                           <span className="text-muted-foreground">{key}: </span>
-                          <span className="font-medium">{String(value)}</span>
+                          <span className="font-medium tabular-nums">
+                            {formatAnalysisMetricValue(key, value)}
+                          </span>
                         </li>
                       ))}
                     </ul>
@@ -328,6 +333,9 @@ export function AnalysisBoard({
               </Card>
             ))
           )}
+        </TabsContent>
+        <TabsContent value="portfolio">
+          <AnalysisPortfolioTab portfolio={data.measurement.portfolio} />
         </TabsContent>
         <TabsContent value="lacunas">
           <Card>
