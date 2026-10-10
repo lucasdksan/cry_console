@@ -109,7 +109,12 @@ export async function loadAgentWorkspaceContext(input: {
       dto.overallScore !== null
         ? `Score geral: ${dto.overallScore} (${dto.overallStatus})`
         : `Status geral: ${dto.overallStatus}`,
-    ].join("\n");
+      dto.measurement.portfolio?.available
+        ? dto.measurement.portfolio.llmSummary
+        : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
   }
 
   const metricKeyForChart = resolveMetricKeyForCommand(input.command);

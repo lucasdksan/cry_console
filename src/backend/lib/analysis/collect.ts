@@ -1,5 +1,16 @@
 import { buildAnalysisMeasurement } from "@/backend/lib/analysis/heuristics";
+import {
+  buildAnalysisPortfolio,
+  createPortfolioAccumulator,
+} from "@/backend/lib/analysis/portfolio";
 import type { AnalysisMeasurementJson } from "@/backend/lib/analysis/types";
+import { collectGa4Items } from "@/backend/lib/google/ga4-items-collector";
+import {
+  GA4_READONLY_SCOPE,
+  GSC_READONLY_SCOPE,
+  getGoogleAccessToken,
+} from "@/backend/lib/google/google-auth";
+import { collectGscPages } from "@/backend/lib/google/gsc-pages-collector";
 import {
   analyticsFromMeasurement,
   clarityFromMeasurement,
@@ -71,6 +82,8 @@ export async function collectAnalysisInputs(input: {
     measurementSources.push("clarity");
   }
 
+  const portfolioAccumulator = createPortfolioAccumulator(10_000);
+
   const vtexPromise = (async (): Promise<{
     result: VtexCollectResult | null;
     error?: string;
@@ -93,6 +106,10 @@ export async function collectAnalysisInputs(input: {
         siteUrl: config.siteUrl,
         period: { start: period.start, end: period.end },
         collectors: ["orders"],
+        ordersOptions: {
+          includeItems: true,
+          onPage: (page) => portfolioAccumulator.feedPage(page),
+        },
       });
       return { result };
     } catch (error) {
@@ -181,6 +198,95 @@ export async function collectAnalysisInputs(input: {
     clarity: clarityFromMeasurement(measurementResult),
     metricDays,
   });
+
+  let ga4Items = null;
+  let ga4PortfolioOk = false;
+  let gscPages = null;
+  let gscPortfolioOk = false;
+
+  const needsPortfolioGoogle =
+    (isGa4Configured(input.workspace) && gaOk) ||
+    (isGscConfigured(input.workspace) && gscOk);
+
+  if (needsPortfolioGoogle) {
+    try {
+      const secrets = await getWorkspaceMeasurementSecretsForUser(
+        input.userId,
+        input.workspaceId,
+      );
+      if (secrets.gaServiceAccount) {
+        const scopes = [
+          ...(isGa4Configured(input.workspace) && gaOk
+            ? [GA4_READONLY_SCOPE]
+            : []),
+          ...(isGscConfigured(input.workspace) && gscOk
+            ? [GSC_READONLY_SCOPE]
+            : []),
+        ];
+        const token = await getGoogleAccessToken(
+          secrets.gaServiceAccount,
+          scopes,
+        );
+        const periodInput = { start: period.start, end: period.end };
+
+        await Promise.all([
+          (async () => {
+            if (!isGa4Configured(input.workspace) || !gaOk) {
+              return;
+            }
+            if (!input.workspace.gaPropertyId) {
+              return;
+            }
+            try {
+              ga4Items = await collectGa4Items({
+                accessToken: token,
+                propertyId: input.workspace.gaPropertyId,
+                period: periodInput,
+              });
+              ga4PortfolioOk = true;
+            } catch {
+              ga4PortfolioOk = false;
+            }
+          })(),
+          (async () => {
+            if (!isGscConfigured(input.workspace) || !gscOk) {
+              return;
+            }
+            try {
+              gscPages = await collectGscPages({
+                accessToken: token,
+                siteUrl: secrets.siteUrl,
+                period: periodInput,
+              });
+              gscPortfolioOk = true;
+            } catch {
+              gscPortfolioOk = false;
+            }
+          })(),
+        ]);
+      }
+    } catch {
+      ga4PortfolioOk = false;
+      gscPortfolioOk = false;
+    }
+  }
+
+  if (isVtexConfigured(input.workspace)) {
+    const portfolio = buildAnalysisPortfolio({
+      snapshot: portfolioAccumulator.snapshot(),
+      ga4Items,
+      ga4Ok: ga4PortfolioOk,
+      gscPages,
+      gscOk: gscPortfolioOk,
+    });
+    measurement.portfolio = portfolio;
+    if (portfolio.dataGaps.length > 0) {
+      measurement.dataGaps = [
+        ...measurement.dataGaps,
+        ...portfolio.dataGaps,
+      ];
+    }
+  }
 
   return { measurement, period, collectedAt };
 }

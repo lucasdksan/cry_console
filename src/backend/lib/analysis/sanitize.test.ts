@@ -42,6 +42,29 @@ describe("analysis-sanitize", () => {
     expect(json).not.toContain("client_email");
   });
 
+  it("inclui resumo de portfólio quando disponível", () => {
+    const json = buildLlmPayloadFromMeasurement({
+      ...sampleMeasurement,
+      portfolio: {
+        available: true,
+        populationOrders: 1,
+        cappedAtMax: false,
+        skuCount: 1,
+        revenueLineTotal: 10,
+        revenueOrderTotal: 10,
+        reconciliationGapPct: 0,
+        abcSlices: [],
+        clusters: [],
+        topSkus: [],
+        risks: [],
+        dataGaps: [],
+        llmSummary: "Portfólio VTEX (30 dias, fonte: vtex): teste.",
+      },
+    });
+    expect(json).toContain("portfolio_summary");
+    expect(json).toContain("fonte: vtex");
+  });
+
   it("lista métricas permitidas para target_metric", () => {
     const keys = collectAllowedTargetMetrics(sampleMeasurement);
     expect(keys.has("vtex_revenue")).toBe(true);

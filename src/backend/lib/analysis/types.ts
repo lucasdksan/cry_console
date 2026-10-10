@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import type { AnalysisPortfolioJson } from "@/backend/lib/analysis/portfolio/types";
 import { PILLARS, type Pillar } from "@/backend/lib/vtex/registry";
 
 export { PILLARS, type Pillar };
@@ -54,6 +55,7 @@ export type AnalysisMeasurementJson = {
   overallScore: number | null;
   overallStatus: AnalysisPillarStatus | "Indisponível";
   dataGaps: AnalysisDataGap[];
+  portfolio?: AnalysisPortfolioJson;
 };
 
 export const narrativeActionItemSchema = z.object({

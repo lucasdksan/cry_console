@@ -34,13 +34,16 @@ export function assertSanitizedMetrics(
 export function buildLlmPayloadFromMeasurement(
   measurement: AnalysisMeasurementJson,
 ): string {
-  const payload = {
+  const payload: Record<string, unknown> = {
     periodLabel: measurement.periodLabel,
     overallScore: measurement.overallScore,
     overallStatus: measurement.overallStatus,
     dataGaps: measurement.dataGaps,
     pillars: measurement.pillars.map((p) => sanitizePillarForLlm(p)),
   };
+  if (measurement.portfolio?.available) {
+    payload.portfolio_summary = measurement.portfolio.llmSummary;
+  }
   return JSON.stringify(payload, null, 2);
 }
 
