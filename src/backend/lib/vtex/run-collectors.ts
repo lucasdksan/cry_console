@@ -1,7 +1,10 @@
 import { VtexClient, type VtexClientConfig } from "@/backend/lib/vtex/client";
 import { collectCategoryTree } from "@/backend/lib/vtex/collectors/category-tree";
 import { collectCheckout } from "@/backend/lib/vtex/collectors/checkout";
-import type { VtexCollectContext } from "@/backend/lib/vtex/collectors/context";
+import type {
+  OrdersCollectOptions,
+  VtexCollectContext,
+} from "@/backend/lib/vtex/collectors/context";
 import { collectInventory } from "@/backend/lib/vtex/collectors/inventory";
 import { collectLogisticsShipments } from "@/backend/lib/vtex/collectors/logistics-shipments";
 import { collectOrders } from "@/backend/lib/vtex/collectors/orders";
@@ -28,6 +31,7 @@ export type RunVtexCollectOptions = {
   siteUrl: string;
   period: VtexPeriod;
   collectors?: VtexCollector[];
+  ordersOptions?: OrdersCollectOptions;
 };
 
 async function runSingleCollector(
@@ -98,6 +102,7 @@ export async function runVtexCollect(
     dateFrom: options.period.start,
     dateTo: options.period.end,
     siteUrl: options.siteUrl,
+    ordersOptions: options.ordersOptions,
   };
 
   const settled = await Promise.all(

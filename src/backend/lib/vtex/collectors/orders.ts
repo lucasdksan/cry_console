@@ -28,18 +28,26 @@ export async function collectOrders(
   const rawOrders: Record<string, unknown>[] = [];
   let partialError: string | undefined;
 
+  const includeItems = ctx.ordersOptions?.includeItems === true;
+  const onPage = ctx.ordersOptions?.onPage;
+
   for (let page = 1; page <= 200 && rawOrders.length < MAX_ORDERS; page += 1) {
     try {
-      const batch = await client.get("/api/oms/pvt/orders", {
+      const query: Record<string, string | number> = {
         f_creationDate: `creationDate:[${dateFrom} TO ${dateTo}]`,
         page,
         per_page: 100,
         orderBy: "creationDate,desc",
-      });
+      };
+      if (includeItems) {
+        query._items = "1";
+      }
+      const batch = await client.get("/api/oms/pvt/orders", query);
       const pageOrders = extractOrderBatch(batch);
       if (pageOrders.length === 0) {
         break;
       }
+      onPage?.(pageOrders);
       rawOrders.push(...pageOrders);
       if (pageOrders.length < 100) {
         break;
