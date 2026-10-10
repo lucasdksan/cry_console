@@ -24,7 +24,7 @@ export function PageAuditNarrativeCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Resumo com IA</CardTitle>
+        <CardTitle className="text-base">Resumo</CardTitle>
         <CardDescription>
           {narrative
             ? `Confiança: ${narrative.confidence}`

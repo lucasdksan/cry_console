@@ -62,7 +62,7 @@ export function SeoChecklistPanel({ workspaceId, items, onUpdated }: SeoChecklis
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Checklist FastStore (liveSEO)</CardTitle>
+        <CardTitle className="text-base">Checklist</CardTitle>
         <CardDescription>
           Itens que o crawl não valida — marque conforme implementação no projeto da loja.
         </CardDescription>
