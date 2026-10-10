@@ -17,6 +17,11 @@ import {
   EmptyHeader,
   EmptyTitle,
 } from "@/frontend/components/ui/empty";
+import {
+  formatCtrPercentPoints,
+  formatGscPosition,
+  formatPtInteger,
+} from "@/frontend/lib/format-analysis-metric";
 
 type PageAuditRoleReportProps = {
   roleReport: PageAuditRoleReport;
@@ -115,15 +120,21 @@ export function PageAuditRoleReportPanel({ roleReport, variant }: PageAuditRoleR
           <CardContent className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
             <div>
               <p className="text-muted-foreground">Cliques</p>
-              <p className="font-medium tabular-nums">{report.storeContext.gscClicks ?? "—"}</p>
+              <p className="font-medium tabular-nums">
+                {formatPtInteger(report.storeContext.gscClicks)}
+              </p>
             </div>
             <div>
               <p className="text-muted-foreground">CTR %</p>
-              <p className="font-medium tabular-nums">{report.storeContext.gscCtrPct ?? "—"}</p>
+              <p className="font-medium tabular-nums">
+                {formatCtrPercentPoints(report.storeContext.gscCtrPct)}
+              </p>
             </div>
             <div>
               <p className="text-muted-foreground">Posição</p>
-              <p className="font-medium tabular-nums">{report.storeContext.gscPosition ?? "—"}</p>
+              <p className="font-medium tabular-nums">
+                {formatGscPosition(report.storeContext.gscPosition)}
+              </p>
             </div>
           </CardContent>
         </Card>
